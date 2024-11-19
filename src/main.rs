@@ -74,7 +74,7 @@ fn main() {
     let tolerance = 20.0; // La tolleranza, ad esempio 20px
 
     // Variabile per scegliere la modalità
-    let mode = "rectangle"; // Puoi cambiarlo a "x" per la modalità X
+    let mode = "x"; // x per tutti i lati, rectangle per il rett lungo i bordi 
 
     // Crea un `ScreenEdges` protetto da Mutex per l’accesso sicuro
     let edges_tracker = Arc::new(Mutex::new(ScreenEdges::default()));
