@@ -34,6 +34,21 @@ impl ScreenEdges {
         }
     }
 
+    // Funzione per aggiornare i bordi in base alla posizione del mouse (Modalità rettangolo)
+    //Ogni volta che il mouse si sposta, il codice verifica se il mouse è abbastanza vicino (entro una tolleranza)
+    //a uno dei bordi dello schermo. Se il mouse è vicino a uno dei bordi, il programma segna quel bordo come "toccato"
+    fn update_edges_rectangle(&mut self, x: f64, y: f64, screen_width: f64, screen_height: f64, tolerance: f64) {
+        // Aggiorniamo i bordi in modo che coprano tutto il perimetro dello schermo
+        if x <= tolerance || x >= screen_width - tolerance { // Bordo sinistro o destro
+            self.left = true;
+            self.right = true;
+        }
+        if y <= tolerance || y >= screen_height - tolerance { // Bordo superiore o inferiore
+            self.top = true;
+            self.bottom = true;
+        }
+    }
+
     // Resetta i bordi
     fn reset(&mut self) {
         *self = ScreenEdges::default();
@@ -56,6 +71,10 @@ fn main() {
     // Impostiamo le dimensioni dello schermo (esempio)
     let screen_width = 1920.0; // Larghezza dello schermo
     let screen_height = 1080.0; // Altezza dello schermo
+    let tolerance = 20.0; // La tolleranza, ad esempio 20px
+
+    // Variabile per scegliere la modalità
+    let mode = "rectangle"; // Puoi cambiarlo a "x" per la modalità X
 
     // Crea un `ScreenEdges` protetto da Mutex per l’accesso sicuro
     let edges_tracker = Arc::new(Mutex::new(ScreenEdges::default()));
@@ -74,7 +93,11 @@ fn main() {
                 *tracking = true; // Attiva il tracciamento
                 let mut edges = edges_tracker_clone.lock().unwrap();
                 edges.reset(); // Resetta i bordi all'inizio di una nuova sequenza
-                println!("Tracciamento dei bordi iniziato");
+                if mode == "rectangle" {
+                    println!("Tracciamento dei bordi in modalità rettangolare iniziato");
+                } else {
+                    println!("Tracciamento dei bordi in modalità X iniziato");
+                }
             }
             // Fine del tracciamento quando viene rilasciato il tasto sinistro
             EventType::ButtonRelease(Button::Left) => {
@@ -83,10 +106,18 @@ fn main() {
                 
                 let edges = edges_tracker_clone.lock().unwrap();
                 if edges.all_edges_touched() {
-                    println!("Tutti i bordi coperti, avvio del backup...");
+                    if mode == "rectangle" {
+                        println!("Tutti i bordi coperti in modalità rettangolare, avvio del backup...");
+                    } else {
+                        println!("Tutti i bordi coperti in modalità X, avvio del backup...");
+                    }
                     avvia_backup();
                 } else {
-                    println!("Tracciamento interrotto, non tutti i bordi sono stati coperti.");
+                    if mode == "rectangle" {
+                        println!("Tracciamento interrotto in modalità rettangolare, non tutti i bordi sono stati coperti.");
+                    } else {
+                        println!("Tracciamento interrotto in modalità X, non tutti i bordi sono stati coperti.");
+                    }
                 }
             }
             // Registra i movimenti solo se il tracciamento è attivo
@@ -94,7 +125,11 @@ fn main() {
                 let tracking = tracking_active.lock().unwrap();
                 if *tracking {
                     let mut edges = edges_tracker.lock().unwrap();
-                    edges.update_edges(x, y, screen_width, screen_height);
+                    if mode == "rectangle" {
+                        edges.update_edges_rectangle(x, y, screen_width, screen_height, tolerance);
+                    } else {
+                        edges.update_edges(x, y, screen_width, screen_height);
+                    }
                 }
             }
             _ => {}
