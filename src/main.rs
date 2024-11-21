@@ -2,6 +2,9 @@ use rdev::{listen, EventType, Button};
 use std::fs;
 use std::path::Path;
 use std::sync::{Arc, Mutex};
+use rodio::{Decoder, OutputStream, Sink, source::Source};
+use std::fs::File;
+use std::io::BufReader;
 
 // Struttura per tenere traccia dei bordi coperti
 #[derive(Default)]
@@ -109,14 +112,30 @@ impl HorizontalLineTracker {
     }
 }
 
+fn play_sound(file_path: &str) {
+    if let Ok(file) = File::open(file_path) {
+        // Prova a riprodurre il file
+        let (_stream, stream_handle) = OutputStream::try_default().unwrap();
+        let source = Decoder::new(BufReader::new(file)).unwrap();
+        stream_handle.play_raw(source.convert_samples()).unwrap();
+
+        // Attendi che l'audio venga riprodotto
+        std::thread::sleep(std::time::Duration::from_secs(3));
+    } else {
+        println!("Errore: file audio non trovato o non apribile.");
+    }
+}
+
 // Funzione di backup per copiare il file
 fn avvia_backup() {
+    play_sound("Sounds/bubblepop-254773.mp3");
     let src = Path::new("Esempio/to_save.txt"); // Cambia con il percorso del file di origine
     let dest = Path::new("Backup/to_save.txt"); // Cambia con il percorso di destinazione
     
     if let Err(e) = fs::copy(&src, &dest) {
         println!("Errore durante il backup: {:?}", e);
     } else {
+        play_sound("Sounds/bellding-254774.mp3");
         println!("Backup completato con successo!");
     }
 }
@@ -126,7 +145,6 @@ fn main() {
     let screen_width = 1920.0; // Larghezza dello schermo
     let screen_height = 1080.0; // Altezza dello schermo
     let tolerance = 20.0; // La tolleranza, ad esempio 20px
-    
 
     // Variabile per scegliere la modalità
     let mode = "x"; // x per tutti i lati, rectangle per il rett lungo i bordi 
