@@ -1,5 +1,8 @@
-use eframe::egui;
 use super::AppState;
+use crate::backup::backup;
+use crate::ui::MessageType;
+use eframe::egui;
+use std::time::Duration;
 use toml;
 
 const MAX_FILE_TYPES: usize = 10;
@@ -64,10 +67,12 @@ pub fn show_backup_panel(ui: &mut egui::Ui, state: &mut AppState) {
                     error_message = "File type cannot be empty.".to_string();
                 } else if !new_file_type.starts_with('.') {
                     // Check if the entered text starts with a dot (valid file type)
-                    error_message = "File type must start with a dot (e.g., .txt, .png).".to_string();
+                    error_message =
+                        "File type must start with a dot (e.g., .txt, .png).".to_string();
                 } else if state.file_types.len() >= MAX_FILE_TYPES {
                     // Check if the maximum number of file types has been reached
-                    error_message = format!("You can only add up to {} file types.", MAX_FILE_TYPES);
+                    error_message =
+                        format!("You can only add up to {} file types.", MAX_FILE_TYPES);
                 } else {
                     // If no validation errors, add the file type to the list
                     state.file_types.push(new_file_type.clone());
@@ -79,7 +84,7 @@ pub fn show_backup_panel(ui: &mut egui::Ui, state: &mut AppState) {
                 ui.label(format!("{}", error_message));
             }
         });
-        
+
         ui.horizontal(|ui| {
             ui.label("Selected:");
             ui.label(format!("{}/10", state.file_types.len()));
@@ -105,4 +110,47 @@ pub fn show_backup_panel(ui: &mut egui::Ui, state: &mut AppState) {
             std::fs::write("config_build.toml", config).expect("Failed to save configuration");
         }
     });
+
+    ui.separator();
+
+    // ui.horizontal(|ui| {
+    //     if ui.button("Start Backup").clicked() {
+    //         match backup::perform_backup(state) {
+    //             Ok(_) => {
+    //                 ui.label("Backup completed successfully!");
+    //             }
+    //             Err(err) => {
+    //                 ui.label(format!("Backup failed: {}", err));
+    //             }
+    //         }
+    //     }
+    // });
+
+    // Pulsante per avviare il backup
+    ui.horizontal(|ui| {
+        if ui.button("Start Backup").clicked() {
+            match backup::perform_backup(state) {
+                Ok(_) => state.add_feedback_message(
+                    "Backup completed successfully!".to_string(),
+                    MessageType::Success,
+                ),
+                Err(err) => state
+                    .add_feedback_message(format!("Backup failed: {}", err), MessageType::Error),
+            }
+        }
+    });
+
+    // Mostra i messaggi di feedback
+    for message in &state.feedback_messages {
+        let color = match message.message_type {
+            MessageType::Success => egui::Color32::GREEN,
+            MessageType::Error => egui::Color32::RED,
+            MessageType::Information => egui::Color32::BLUE,
+        };
+
+        ui.colored_label(color, &message.message);
+    }
+
+    // Rimuove i messaggi più vecchi di 5 secondi
+    state.remove_expired_messages(Duration::new(5, 0));
 }

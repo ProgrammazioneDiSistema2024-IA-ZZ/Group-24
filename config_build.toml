@@ -1,5 +1,6 @@
 current_panel = "Backup"
-source_folder = 'C:\Users\andre\Desktop\TEST'
-destination_folder = 'C:\Users\andre\Desktop\TEST2'
+source_folder = 'C:\Users\demol\Desktop\TEST'
+destination_folder = 'C:\Users\demol\Desktop\salvataggio'
 backup_type = "custom"
-file_types = [".txt", ".docx"]
+file_types = [".txt", ".png"]
+feedback_messages = []
