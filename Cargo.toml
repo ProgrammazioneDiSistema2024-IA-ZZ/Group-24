@@ -1,0 +1,17 @@
+[package]
+name = "gui_mockup_detector"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+eframe = { version = "0.24", features = ["glow"] }
+rdev = "0.5.3"
+rodio = "0.17"
+
+[[bin]]
+name = "gui"
+path = "src/main.rs"
+
+[[bin]]
+name = "detector"
+path = "src/detector.rs"
