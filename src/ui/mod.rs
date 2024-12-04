@@ -1,6 +1,8 @@
 pub mod analytics;
-pub mod backup;
+pub mod backup_panel;
 pub mod info;
+
+use crate::backup::backup;
 
 use eframe::egui;
 use serde::Serialize;
@@ -36,6 +38,15 @@ pub enum MessageType {
     Information,
 }
 
+// Stato del backup
+#[derive(Serialize)]
+pub enum BackupStatus {
+    NotStarted,
+    InProgress,
+    CompletedSuccess,
+    CompletedError,
+}
+
 // Application state, including the selected panel and configuration
 #[derive(Serialize)]
 pub struct AppState {
@@ -45,6 +56,7 @@ pub struct AppState {
     pub backup_type: String,
     pub file_types: Vec<String>,
     pub feedback_messages: Vec<FeedbackMessage>,
+    pub backup_status: BackupStatus,
 }
 
 impl FeedbackMessage {
@@ -116,6 +128,7 @@ impl Default for AppState {
                 })
                 .unwrap_or_default(),
             feedback_messages: vec![],
+            backup_status: BackupStatus::NotStarted,
         }
     }
 }
@@ -146,8 +159,36 @@ impl AppState {
             }
         });
     }
-}
 
+    // Mostra il pannello con il messaggio del backup
+    pub fn show_backup_window(&mut self, ui: &mut egui::Ui, message: &str) {
+        ui.centered_and_justified(|ui| {
+            ui.label(message);
+            if ui.button("Close").clicked() {
+                self.backup_status = BackupStatus::NotStarted; // Torna allo stato iniziale
+            }
+        });
+    }
+    // Funzione per eseguire il backup
+    pub fn start_backup(&mut self) {
+        self.backup_status = BackupStatus::InProgress; // Imposta il backup come in corso
+
+        // Chiamata alla funzione di backup
+        match backup::perform_backup(self) {
+            Ok(_) => {
+                self.backup_status = BackupStatus::CompletedSuccess;
+                self.add_feedback_message(
+                    "Backup completed successfully!".to_string(),
+                    MessageType::Success,
+                );
+            }
+            Err(err) => {
+                self.backup_status = BackupStatus::CompletedError;
+                self.add_feedback_message(format!("Backup failed: {}", err), MessageType::Error);
+            }
+        }
+    }
+}
 /// Main panel logic
 pub fn main_panel(ctx: &egui::Context, state: &mut AppState) {
     // Left sidebar menu
@@ -170,7 +211,7 @@ pub fn main_panel(ctx: &egui::Context, state: &mut AppState) {
 
     // Right-side central panel
     egui::CentralPanel::default().show(ctx, |ui| match state.current_panel {
-        PanelType::Backup => backup::show_backup_panel(ui, state),
+        PanelType::Backup => backup_panel::show_backup_panel(ui, state),
         PanelType::Analytics => analytics::show_analytics_panel(ui),
         PanelType::Info => info::show_info_panel(ui),
     });

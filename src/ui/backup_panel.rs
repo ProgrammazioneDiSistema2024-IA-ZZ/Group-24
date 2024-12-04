@@ -1,5 +1,4 @@
 use super::AppState;
-use crate::backup::backup;
 use crate::ui::MessageType;
 use eframe::egui;
 use std::time::Duration;
@@ -129,14 +128,16 @@ pub fn show_backup_panel(ui: &mut egui::Ui, state: &mut AppState) {
     // Pulsante per avviare il backup
     ui.horizontal(|ui| {
         if ui.button("Start Backup").clicked() {
-            match backup::perform_backup(state) {
-                Ok(_) => state.add_feedback_message(
-                    "Backup completed successfully!".to_string(),
-                    MessageType::Success,
-                ),
-                Err(err) => state
-                    .add_feedback_message(format!("Backup failed: {}", err), MessageType::Error),
-            }
+            // match backup::perform_backup(state) {
+            //     Ok(_) => state.add_feedback_message(
+            //         "Backup completed successfully!".to_string(),
+            //         MessageType::Success,
+            //     ),
+            //     Err(err) => state
+            //         .add_feedback_message(format!("Backup failed: {}", err), MessageType::Error),
+            // }
+
+            AppState::start_backup(state);
         }
     });
 

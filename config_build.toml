@@ -4,3 +4,4 @@ destination_folder = 'C:\Users\demol\Desktop\salvataggio'
 backup_type = "custom"
 file_types = [".txt", ".png"]
 feedback_messages = []
+backup_status = "NotStarted"
