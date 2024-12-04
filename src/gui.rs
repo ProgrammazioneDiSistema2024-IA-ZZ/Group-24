@@ -28,17 +28,17 @@ impl MyApp {
             let running = detector_running.lock().unwrap();
             *running
         };
-
+    
         if already_running {
             println!("Il detector è già in esecuzione.");
             return;
         }
-
+    
         match Command::new("cargo")
             .arg("run")
             .arg("--bin")
             .arg("detector")
-            .stdout(Stdio::inherit()) // Mostra l'output del detector nel terminale
+            .stdout(Stdio::inherit())
             .stderr(Stdio::inherit())
             .spawn()
         {
@@ -46,6 +46,9 @@ impl MyApp {
                 let mut running = detector_running.lock().unwrap();
                 *running = true;
                 println!("Detector avviato!");
+    
+                // Chiude automaticamente la GUI
+                std::process::exit(0); // Termina l'applicazione
             }
             Err(e) => {
                 let mut running = detector_running.lock().unwrap();
@@ -54,6 +57,7 @@ impl MyApp {
             }
         }
     }
+    
 }
 
 impl eframe::App for MyApp {

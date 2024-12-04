@@ -7,11 +7,16 @@ edition = "2021"
 eframe = { version = "0.24", features = ["glow"] }
 rdev = "0.5.3"
 rodio = "0.17"
+egui = "0.23"
 
 [[bin]]
-name = "gui"
+name = "main"
 path = "src/main.rs"
 
 [[bin]]
 name = "detector"
 path = "src/detector.rs"
+
+[[bin]]
+name = "confirmation"
+path = "src/confirmation.rs"

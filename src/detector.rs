@@ -5,6 +5,7 @@ use std::sync::{Arc, Mutex};
 use rodio::{Decoder, OutputStream, source::Source};
 use std::fs::File;
 use std::io::BufReader;
+use std::process::Command;
 
 // Struttura per tenere traccia dei bordi coperti
 #[derive(Default)]
@@ -16,7 +17,7 @@ struct ScreenEdges {
 }
 
 impl ScreenEdges {
-    fn all_edges_touched(&self) -> bool {   
+    fn all_edges_touched(&self) -> bool {
         self.top && self.bottom && self.left && self.right
     }
 
@@ -59,10 +60,11 @@ impl HorizontalLineTracker {
     }
 
     fn update(&mut self, x: f64, y: f64) {
-        if self.start_x.is_none() {
+        if self.start_x.is_none() || self.start_y.is_none() {
             self.start_x = Some(x);
             self.start_y = Some(y);
         }
+
         self.end_x = Some(x);
         self.end_y = Some(y);
 
@@ -71,6 +73,7 @@ impl HorizontalLineTracker {
         {
             let horizontal_distance = (end_x - start_x).abs();
             let vertical_distance = (end_y - start_y).abs();
+
             self.is_horizontal = horizontal_distance > 100.0 && vertical_distance < 50.0;
         }
     }
@@ -103,61 +106,63 @@ fn avvia_backup() {
     }
 }
 
+fn show_confirmation_window() {
+    std::thread::spawn(|| {
+        let status = Command::new("cargo")
+            .arg("run")
+            .arg("--bin")
+            .arg("confirmation")
+            .status();
+
+        if let Ok(exit_status) = status {
+            if exit_status.success() {
+                println!("Conferma ricevuta, avvio backup...");
+                avvia_backup();
+            } else {
+                println!("Backup annullato dall'utente.");
+            }
+        } else {
+            eprintln!("Errore nell'avviare la finestra di conferma.");
+        }
+    });
+}
+
 pub fn run() {
     let screen_width = 1920.0;
     let screen_height = 1080.0;
 
-    let mode = "x";
-
     let edges_tracker = Arc::new(Mutex::new(ScreenEdges::default()));
     let tracking_active = Arc::new(Mutex::new(false));
+    let line_tracker = Arc::new(Mutex::new(HorizontalLineTracker::new()));
     let waiting_for_confirmation = Arc::new(Mutex::new(false));
-    let horizontal_line_tracker = Arc::new(Mutex::new(HorizontalLineTracker::new()));
 
     let edges_tracker_clone = Arc::clone(&edges_tracker);
     let tracking_active_clone = Arc::clone(&tracking_active);
+    let line_tracker_clone = Arc::clone(&line_tracker);
     let waiting_for_confirmation_clone = Arc::clone(&waiting_for_confirmation);
-    let horizontal_line_tracker_clone = Arc::clone(&horizontal_line_tracker);
 
     if let Err(error) = listen(move |event| {
         match event.event_type {
             EventType::ButtonPress(Button::Left) => {
                 let mut tracking = tracking_active_clone.lock().unwrap();
-                let waiting = waiting_for_confirmation_clone.lock().unwrap();
-
-                if !*waiting {
-                    *tracking = true;
-                    let mut edges = edges_tracker_clone.lock().unwrap();
-                    edges.reset();
-                    println!("Tracciamento iniziato.");
-                } else {
-                    let mut line_tracker = horizontal_line_tracker_clone.lock().unwrap();
-                    line_tracker.reset();
-                    println!("Inizio tracciamento della linea orizzontale.");
-                }
+                *tracking = true;
+                let mut edges = edges_tracker_clone.lock().unwrap();
+                edges.reset();
+                let mut line = line_tracker_clone.lock().unwrap();
+                line.reset();
+                println!("Tracciamento iniziato.");
             }
             EventType::ButtonRelease(Button::Left) => {
                 let mut tracking = tracking_active_clone.lock().unwrap();
-                let mut waiting = waiting_for_confirmation_clone.lock().unwrap();
                 *tracking = false;
 
-                if !*waiting {
-                    let edges = edges_tracker_clone.lock().unwrap();
-                    if edges.all_edges_touched() {
-                        println!("Tutti i bordi coperti. Avvio del backup...");
-                        *waiting = true;
-                    } else {
-                        println!("Non tutti i bordi sono stati coperti.");
-                    }
+                let edges = edges_tracker_clone.lock().unwrap();
+                if edges.all_edges_touched() {
+                    println!("Tutti i bordi coperti. Attendo conferma o linea orizzontale...");
+                    *waiting_for_confirmation_clone.lock().unwrap() = true;
+                    show_confirmation_window();
                 } else {
-                    let line_tracker = horizontal_line_tracker_clone.lock().unwrap();
-                    if line_tracker.is_valid_horizontal() {
-                        println!("Linea orizzontale riconosciuta! Avvio del backup...");
-                        avvia_backup();
-                        *waiting = false;
-                    } else {
-                        println!("Movimento non riconosciuto come linea orizzontale.");
-                    }
+                    println!("Non tutti i bordi sono stati coperti.");
                 }
             }
             EventType::MouseMove { x, y } => {
@@ -167,9 +172,17 @@ pub fn run() {
                 if *tracking {
                     let mut edges = edges_tracker.lock().unwrap();
                     edges.update_edges(x, y, screen_width, screen_height);
-                } else if *waiting {
-                    let mut line_tracker = horizontal_line_tracker.lock().unwrap();
-                    line_tracker.update(x, y);
+                }
+
+                if *waiting {
+                    let mut line = line_tracker.lock().unwrap();
+                    line.update(x, y);
+
+                    if line.is_valid_horizontal() {
+                        println!("Linea orizzontale riconosciuta!");
+                        *waiting_for_confirmation_clone.lock().unwrap() = false;
+                        avvia_backup();
+                    }
                 }
             }
             _ => {}
