@@ -1,8 +1,11 @@
 use eframe::egui;
-use super::AppState;
+use crate::utils::manage_configuration_file;
+
+use super::{AppState, ErrorSource};
 use toml;
 
 const MAX_FILE_TYPES: usize = 10;
+const MAX_EXTENSION_LENGTH: usize = 6; // Including the dot
 
 /// Display the backup panel and its related components
 pub fn show_backup_panel(ui: &mut egui::Ui, state: &mut AppState) {
@@ -15,7 +18,7 @@ pub fn show_backup_panel(ui: &mut egui::Ui, state: &mut AppState) {
             }
         }
     });
-    ui.horizontal(|ui| {
+    ui.horizontal_wrapped(|ui| {
         ui.label("Chosen:");
         ui.add(egui::Label::new(&state.source_folder).wrap(true));
     });
@@ -31,7 +34,7 @@ pub fn show_backup_panel(ui: &mut egui::Ui, state: &mut AppState) {
             }
         }
     });
-    ui.horizontal(|ui| {
+    ui.horizontal_wrapped(|ui| {
         ui.label("Chosen:");
         ui.add(egui::Label::new(&state.destination_folder).wrap(true));
     });
@@ -51,33 +54,51 @@ pub fn show_backup_panel(ui: &mut egui::Ui, state: &mut AppState) {
 
     // 4th row: File type customization (only for "custom")
     if state.backup_type == "custom" {
-        ui.horizontal(|ui| {
+        ui.horizontal_wrapped(|ui| {
             ui.label("Insert type of file:");
-            let mut new_file_type = String::new();
-            ui.text_edit_singleline(&mut new_file_type);
-            // Define a mutable variable to track the validation error message
-            let mut error_message = String::new();
+            ui.text_edit_singleline(&mut state.new_file_type);
 
             if ui.button("+").clicked() {
-                // Check if the file type is not empty and contains a valid extension
-                if new_file_type.is_empty() {
-                    error_message = "File type cannot be empty.".to_string();
-                } else if !new_file_type.starts_with('.') {
-                    // Check if the entered text starts with a dot (valid file type)
-                    error_message = "File type must start with a dot (e.g., .txt, .png).".to_string();
+                if state.new_file_type.is_empty() {
+                    state.error_message = Some("File type cannot be empty.".to_string());
+                    state.error_source = Some(ErrorSource::FileTypeValidation);
+                    state.show_error_modal = true;
+                } else if !state.new_file_type.starts_with('.') {
+                    state.error_message = Some("File type must start with a dot (e.g., .txt, .png).".to_string());
+                    state.error_source = Some(ErrorSource::FileTypeValidation);
+                    state.show_error_modal = true;
+                } else if state.new_file_type.len() > MAX_EXTENSION_LENGTH {
+                    state.error_message = Some(format!(
+                        "File type must be at most {} characters long, including the dot.",
+                        MAX_EXTENSION_LENGTH
+                    ));
+                    state.error_source = Some(ErrorSource::FileTypeValidation);
+                    state.show_error_modal = true;
+                } else if !state.new_file_type[1..].chars().all(|c| c.is_alphanumeric() || c == '-' || c == '_') {
+                    state.error_message = Some("File type contains invalid characters. Only alphanumeric characters, hyphens (-), and underscores (_) are allowed.".to_string());
+                    state.error_source = Some(ErrorSource::FileTypeValidation);
+                    state.show_error_modal = true;
                 } else if state.file_types.len() >= MAX_FILE_TYPES {
-                    // Check if the maximum number of file types has been reached
-                    error_message = format!("You can only add up to {} file types.", MAX_FILE_TYPES);
+                    state.error_message = Some(format!(
+                        "You can only add up to {} file types.",
+                        MAX_FILE_TYPES
+                    ));
+                    state.error_source = Some(ErrorSource::FileTypeValidation);
+                    state.show_error_modal = true;
+                } else if state.file_types.contains(&state.new_file_type) {
+                    state.error_message = Some("File type is already in the list.".to_string());
+                    state.error_source = Some(ErrorSource::FileTypeValidation);
+                    state.show_error_modal = true;
                 } else {
-                    // If no validation errors, add the file type to the list
-                    state.file_types.push(new_file_type.clone());
+                    // Add the file type and clear any errors
+                    state.file_types.push(state.new_file_type.clone());
+                    state.new_file_type.clear();
+                    state.error_message = None;
+                    state.error_source = None;
+                    state.show_error_modal = false;
                 }
             }
-
-            // Show error message in red if there is an error
-            if !error_message.is_empty() {
-                ui.label(format!("{}", error_message));
-            }
+            
         });
         
         ui.horizontal(|ui| {
@@ -89,6 +110,27 @@ pub fn show_backup_panel(ui: &mut egui::Ui, state: &mut AppState) {
                 if ui.button(file_type).clicked() {
                     state.file_types.remove(index);
                 }
+
+
+                /* // Carica l'immagine del cestino come texture
+                let delete_icon = load_image_as_egui_texture(ui.ctx(), "images/delete.png");
+
+                // Configura il bottone con testo e icona
+                let button_content = ui.horizontal(|ui| {
+                    ui.label(file_type); // Testo dell'estensione
+                    if let Some(icon) = &delete_icon {
+                        ui.image(icon.id(), [16.0, 16.0]); // Aggiunge l'icona accanto al testo
+                    }
+                });
+
+                // Disegna il pulsante e gestisce il click
+                if ui
+                    .add(egui::Button::new(button_content.response))
+                    .on_hover_text("Click to remove") // Tooltip
+                    .clicked()
+                {
+                    state.file_types.remove(index); // Rimuove l'estensione
+                } */
             }
         });
     }
@@ -98,11 +140,33 @@ pub fn show_backup_panel(ui: &mut egui::Ui, state: &mut AppState) {
     // 5th row: Restore and Save buttons
     ui.horizontal(|ui| {
         if ui.button("Restore").clicked() {
-            *state = AppState::default(); // Reload from config file
+            //siamo sicuri che se siamo qui, il file di configurazione è valido, i controlli importanti sono stati fattinel main
+            let config = manage_configuration_file();
+            *state = AppState::new_from_config(config); // Reload from config file
         }
         if ui.button("Save").clicked() {
-            let config = toml::to_string(&state).unwrap_or_default();
-            std::fs::write("config_build.toml", config).expect("Failed to save configuration");
+            // Prova a serializzare lo stato in formato TOML e a salvare il file
+            match toml::to_string(&state) {
+                Ok(config) => {
+                    if let Err(e) = std::fs::write("config_build.toml", config) {
+                        state.error_message = Some(format!("Failed to save configuration: {}", e));
+                        state.error_source = Some(ErrorSource::SaveOperation);
+                        state.show_error_modal = true;
+                    } else {
+                        state.error_message = None; // Nessun errore, cancella eventuali messaggi precedenti
+                        state.error_source = None;
+                        state.show_error_modal = false;
+                    }
+                }
+                Err(e) => {
+                    state.error_message = Some(format!("Serialization error: {}", e));
+                    state.error_source = Some(ErrorSource::SaveOperation);
+                    state.show_error_modal = true;
+                }
+            }
         }
     });
+
+    //Stato dell'applicazione
+    
 }
