@@ -1,39 +1,47 @@
-/* use crate::ui::AppState;
+use crate::utils::manage_configuration_file;
+use crate::utils::Configuration;
 use std::fs;
 use std::io;
 use std::path::Path;
 
 /// Esegue il backup dei file dalla sorgente alla destinazione
 pub fn perform_backup() -> Result<(), String> {
-    // Verifica che le cartelle di origine e destinazione siano definite
-    if state.source_folder.is_empty() {
-        return Err("Source folder is not selected.".to_string());
-    }
-    if state.destination_folder.is_empty() {
-        return Err("Destination folder is not selected.".to_string());
-    }
+    // recupera i dati dall aconfigurazione statica (e non da AppState, che è dinamico)
+    let config = manage_configuration_file();
 
-    let source_path = Path::new(&state.source_folder);
-    let dest_path = Path::new(&state.destination_folder);
+    // Verifica se config è di tipo Configuration::Build
+    if let Configuration::Build(source_folder, destination_folder, backup_type, file_types) = config {
+        // Salva i campi in variabili
+        let source_folder = source_folder; // String
+        let destination_folder = destination_folder; // String
+        let backup_type = backup_type; // String
+        let file_types = file_types; // Vec<String>
 
-    // Verifica che le cartelle esistano
-    if !source_path.is_dir() {
-        return Err("Source folder does not exist.".to_string());
+        let source_path = Path::new(&source_folder);
+        let dest_path = Path::new(&destination_folder);
+
+        // Verifica che le cartelle esistano
+        if !source_path.is_dir() {
+            return Err(format!("Source folder: `{}` does not exist.", source_folder));
+        }
+        if !dest_path.is_dir() {
+            return Err(format!("Destination folder: `{}` does not exist.", destination_folder));
+        }
+
+        // Determina i tipi di file da includere
+        let include_all = backup_type == "total" || (backup_type == "custom" && file_types.len() == 0);
+        let file_types: Vec<&str> = file_types.iter().map(|s| s.as_str()).collect();
+
+        // Esegui il backup
+        if let Err(e) = backup_folder(source_path, dest_path, include_all, &file_types) {
+            return Err(format!("Backup failed: {}", e));
+        }
+
+        Ok(())
     }
-    if !dest_path.is_dir() {
-        return Err("Destination folder does not exist.".to_string());
+    else {
+        return Err("Configurazione non valida. Imposta una configurazione valida dal pannello di Backup!".to_string())
     }
-
-    // Determina i tipi di file da includere
-    let include_all = state.backup_type == "total";
-    let file_types: Vec<&str> = state.file_types.iter().map(|s| s.as_str()).collect();
-
-    // Esegui il backup
-    if let Err(e) = backup_folder(source_path, dest_path, include_all, &file_types) {
-        return Err(format!("Backup failed: {}", e));
-    }
-
-    Ok(())
 }
 
 /// Funzione ricorsiva per copiare i file dalla sorgente alla destinazione
@@ -75,4 +83,3 @@ fn matches_file_type(file: &Path, file_types: &[&str]) -> bool {
         false
     }
 }
- */

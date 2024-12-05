@@ -1,9 +1,8 @@
 use rdev::{listen, EventType, Button};
 use std::sync::{Arc, Mutex};
-use std::{fs, thread};
-use std::path::Path;
-//use crate::transfer::perform_backup;
-use crate::ui::AppState;
+use std::thread;
+use crate::transfer::perform_backup;
+use crate::ui::{AppState, BackupStatus};
 use std::time::Duration;
 
 #[derive(Default)]
@@ -39,29 +38,31 @@ impl ScreenEdges {
     }
 }
 
-fn avvia_backup() {
+fn avvia_backup(shared_state: Arc<Mutex<AppState>>) {
+    //viene monitorato lo stato di avanzamento del backup...
+    shared_state.lock().unwrap().backup_status = BackupStatus::InProgress;
 
-    /* match perform_backup() {
-        Ok(_) => {
-            self.backup_status = BackupStatus::CompletedSuccess;
-        }
-        Err(err) => {
-            
-        }
-    } */
-    println!("Avvio del backup...");
-
-    let total_steps = 120;
+    //simula processo di backup di 60 secondi...
+    let total_steps = 65;
     for i in 1..=total_steps {
         // Simula un passo del processo di backup
         thread::sleep(Duration::from_secs(1));  // Pausa di 1 secondo per ogni passo
-        println!("Backup in corso... ");
+        if i % 10 == 0 {
+            println!("Backup in corso... {}%", i/total_steps * 100);
+        }
     }
 
-    println!("Backup completato con successo!");
+    match perform_backup() {
+        Ok(_) => {
+            shared_state.lock().unwrap().backup_status = BackupStatus::CompletedSuccess;
+        }
+        Err(err) => {
+            shared_state.lock().unwrap().backup_status = BackupStatus::CompletedError(err);
+        }
+    }
 }
 
-pub fn run() {
+pub fn run(shared_state: Arc<Mutex<AppState>>) {
     let screen_width = 1920.0;
     let screen_height = 1080.0;
 
@@ -70,6 +71,7 @@ pub fn run() {
 
     let edges_tracker_clone = Arc::clone(&edges_tracker);
     let tracking_active_clone = Arc::clone(&tracking_active);
+
 
     if let Err(error) = listen(move |event| {
         match event.event_type {
@@ -87,7 +89,9 @@ pub fn run() {
                 let edges = edges_tracker_clone.lock().unwrap();
                 if edges.all_edges_touched() {
                     println!("Tutti i bordi coperti. Avvio del backup...");
-                    avvia_backup();
+
+                    // start backup + clona lo stato condiviso
+                    avvia_backup(Arc::clone(&shared_state));
                 } else {
                     println!("Non tutti i bordi sono stati coperti.");
                 }
@@ -103,5 +107,6 @@ pub fn run() {
         }
     }) {
         eprintln!("Errore nell'ascolto degli eventi: {:?}", error);
+        //dovrebbe terminare l'applicazione? se detector fallisce ############
     }
 }

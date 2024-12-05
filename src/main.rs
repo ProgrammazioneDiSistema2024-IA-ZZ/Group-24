@@ -4,26 +4,20 @@ mod detector;
 mod transfer;
 
 use eframe::{egui, App, NativeOptions};
+use ui::BackupStatus;
 use utils::manage_configuration_file;
 use utils::Configuration;
-use crate::ui::AppState;
+use crate::ui::{AppState, MyApp};
 use utils::load_image_as_icon;
-use std::thread;
-use std::time::Duration;
+use std::sync::{Arc, Mutex};
 
-/* pub fn run_detector() {
-    loop {
-        println!("Detector is running...");
-        thread::sleep(Duration::from_secs(5));
-    }
-} */
 
 fn main() -> Result<(), eframe::Error> {
     // Ottieni la configurazione
     let config = manage_configuration_file();
 
-    // Crea l'AppState basandoti sulla configurazione
-    let app_state = match &config {
+    // Crea un `Arc<Mutex<AppState>>` condiviso
+    let shared_state = Arc::new(Mutex::new(match &config {
         Configuration::Error => {
             let mut state = AppState::new_from_config(Configuration::Error);
             state.exit_message = Some("Impossible to retrieve configuration file!".to_string());
@@ -32,7 +26,7 @@ fn main() -> Result<(), eframe::Error> {
         Configuration::Created | Configuration::Build(_, _, _, _) => {
             AppState::new_from_config(config.clone())
         }
-    };
+    }));
 
     // Load the application icon
     let icon_result = load_image_as_icon("images/icon.png");
@@ -52,32 +46,40 @@ fn main() -> Result<(), eframe::Error> {
     // **** FOR TESTING, delete when you don't need anymore ****
     //app_state.exit_message = Some("Some error message".to_string()); // Set an error message for testing
 
+    // Clona lo stato condiviso per il detector
+    let detector_state = Arc::clone(&shared_state);
 
     // Avvia il detector in un thread separato
     std::thread::spawn(move || {
         println!("Starting detector...");
-        detector::run(); // Sostituisci con la tua logica per il detector
+        detector::run(detector_state); // Sostituisci con la tua logica per il detector
     });
 
     // Avvia la GUI come thread principale
+    let my_app = MyApp::new(Arc::clone(&shared_state));
     eframe::run_native(
         "Group 24 - Backup Application",
         options,
-        Box::new(|_cc| Box::new(app_state)),
+        Box::new(|_cc| Box::new(my_app)),
     )?; //propaga al main errori di run_native
 
     Ok(())
 }
 
 // The update method is the primary place where the UI is rendered and updated. It gets called continuously to refresh the UI.
-impl App for AppState {
-    /// Update function that draws the UI and handles events
+impl App for MyApp {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
-        // Show the error panel if there is an error message
-        if let Some(ref error) = &self.exit_message {
-            ui::exit_panel(ctx, error); // Show the error message panel
+        let mut state = self.state.lock().unwrap(); // Accedi al Mutex
+
+        // Mostra il pannello principale o la finestra del backup
+        if state.backup_status == BackupStatus::NotStarted {
+            if let Some(ref error) = &state.exit_message {
+                ui::exit_panel(ctx, error);
+            } else {
+                ui::main_panel(ctx, &mut *state);
+            }
         } else {
-            ui::main_panel(ctx, self); // Show the main panel if no error
+            ui::show_backup_window(ctx, &mut *state);
         }
     }
 }

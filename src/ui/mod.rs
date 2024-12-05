@@ -5,7 +5,7 @@ pub mod info;
 use eframe::egui;
 use serde::Serialize;
 
-use std::process;
+use std::{process, sync::{Arc, Mutex}};
 
 use crate::utils::Configuration;
 
@@ -24,12 +24,12 @@ pub enum ErrorSource {
     SaveOperation,
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, PartialEq, Eq, Clone)]
 pub enum BackupStatus {
     NotStarted,
     InProgress,
     CompletedSuccess,
-    CompletedError,
+    CompletedError(String),
 }
 
 // Application state, including the selected panel and configuration
@@ -46,6 +46,16 @@ pub struct AppState {
     pub exit_message: Option<String>,
     show_error_modal: bool,            // Controllo per il modale
     pub backup_status: BackupStatus
+}
+
+pub struct MyApp {
+    pub state: Arc<Mutex<AppState>>,
+}
+
+impl MyApp {
+    pub fn new(state: Arc<Mutex<AppState>>) -> Self {
+        MyApp { state }
+    }
 }
 
 impl AppState {
@@ -85,24 +95,25 @@ impl AppState {
 }
 
 pub fn main_panel(ctx: &egui::Context, state: &mut AppState) {
-    // Render the left sidebar menu
-    render_sidebar(ctx, state);
+    render_sidebar(ctx, state, state.show_error_modal);
+    render_main_content(ctx, state, state.show_error_modal);
 
-    // Render the main content based on the current panel
-    render_main_content(ctx, state);
-
-    // Render the error modal if necessary
     if state.show_error_modal {
+        // Renderizza il modale di errore sopra l'overlay
         render_error_modal(ctx, state);
     }
 }
 
 // Render the left sidebar menu
-fn render_sidebar(ctx: &egui::Context, state: &mut AppState) {
+fn render_sidebar(ctx: &egui::Context, state: &mut AppState, disable: bool) {
     egui::SidePanel::left("left_panel")
         .resizable(false)
         .min_width(150.0)
         .show(ctx, |ui| {
+            if disable{
+                ui.set_enabled(false);
+            }
+
             ui.heading("Menu");
 
             if ui.button("Backup Panel").clicked() {
@@ -118,8 +129,11 @@ fn render_sidebar(ctx: &egui::Context, state: &mut AppState) {
 }
 
 // Render the main content area
-fn render_main_content(ctx: &egui::Context, state: &mut AppState) {
+fn render_main_content(ctx: &egui::Context, state: &mut AppState, disable: bool) {
     egui::CentralPanel::default().show(ctx, |ui| {
+        if disable{
+            ui.set_enabled(false);
+        }
         match state.current_panel {
             PanelType::Backup => backup::show_backup_panel(ui, state),
             PanelType::Analytics => analytics::show_analytics_panel(ui),
@@ -164,6 +178,36 @@ pub fn exit_panel(ctx: &egui::Context, error_message: &str) {
             if ui.button("Close").clicked() {
                 // Exit the program after closing the error window
                 process::exit(1); // Non-zero exit code indicates error
+            }
+        });
+    });
+}
+
+pub fn show_backup_window(ctx: &egui::Context, state: &mut AppState) {
+    // Copia il valore di backup_status in una variabile separata
+    let backup_status = state.backup_status.clone();
+
+    // Determina il titolo e il messaggio in base allo stato del backup
+    let (title, message, show_return_button) = match backup_status {
+        BackupStatus::InProgress => ("Backup In Progress", "The backup is currently running...", false),
+        BackupStatus::CompletedSuccess => ("Backup Completed", "Backup completed successfully!", true),
+        BackupStatus::CompletedError(ref err) => ("Backup Failed", err.as_str(), true),
+        BackupStatus::NotStarted => return, // Non mostrare la finestra se il backup non è iniziato
+    };
+
+    // Disegna il pannello centrale
+    egui::CentralPanel::default().show(ctx, |ui| {
+        ui.vertical_centered(|ui| {
+            ui.heading(title); // Titolo
+            ui.separator();    // Separatore
+            ui.label(message); // Messaggio principale
+
+            // Mostra il pulsante "Return back" se necessario
+            if show_return_button {
+                if ui.button("Return back").clicked() {
+                    // Aggiorna lo stato solo quando il pulsante viene cliccato
+                    state.backup_status = BackupStatus::NotStarted;
+                }
             }
         });
     });

@@ -31,7 +31,7 @@ pub fn manage_configuration_file() -> Configuration {
         let default_config = r#"
 source_folder = ''
 destination_folder = ''
-backup_type = ''
+backup_type = 'total'
 file_types = []
 "#;
         if fs::write(config_path, default_config).is_err() {
@@ -54,7 +54,7 @@ file_types = []
             let default_config = r#"
 source_folder = ''
 destination_folder = ''
-backup_type = ''
+backup_type = 'total'
 file_types = []
 "#;
             if fs::write(config_path, default_config).is_err() {

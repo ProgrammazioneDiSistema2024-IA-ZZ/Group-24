@@ -1,8 +1,17 @@
 use eframe::egui;
+use serde::Serialize;
 use crate::utils::manage_configuration_file;
 
 use super::{AppState, ErrorSource};
 use toml;
+
+#[derive(Serialize)]
+pub struct ConfigToSave {
+    pub source_folder: String,
+    pub destination_folder: String,
+    pub backup_type: String,
+    pub file_types: Vec<String>,
+}
 
 const MAX_FILE_TYPES: usize = 10;
 const MAX_EXTENSION_LENGTH: usize = 6; // Including the dot
@@ -145,8 +154,16 @@ pub fn show_backup_panel(ui: &mut egui::Ui, state: &mut AppState) {
             *state = AppState::new_from_config(config); // Reload from config file
         }
         if ui.button("Save").clicked() {
+            // Crea una versione semplificata con i campi che vogliamo serializzare
+            let config_to_save = ConfigToSave {
+                source_folder: state.source_folder.clone(),
+                destination_folder: state.destination_folder.clone(),
+                backup_type: state.backup_type.clone(),
+                file_types: state.file_types.clone(),
+            };
+
             // Prova a serializzare lo stato in formato TOML e a salvare il file
-            match toml::to_string(&state) {
+            match toml::to_string(&config_to_save) {
                 Ok(config) => {
                     if let Err(e) = std::fs::write("config_build.toml", config) {
                         state.error_message = Some(format!("Failed to save configuration: {}", e));
@@ -166,7 +183,5 @@ pub fn show_backup_panel(ui: &mut egui::Ui, state: &mut AppState) {
             }
         }
     });
-
-    //Stato dell'applicazione
     
 }
