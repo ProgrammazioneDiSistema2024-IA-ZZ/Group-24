@@ -1,11 +1,41 @@
 use eframe::IconData;
 use image::RgbaImage;
 use std::error::Error;
-
 use std::path::Path;
 use std::fs;
 use toml;
 use serde::Deserialize;
+use rodio::{Decoder, OutputStream, source::Source};
+use std::fs::File;
+use std::io::BufReader;
+use winapi::um::winuser::{GetSystemMetrics, SM_CXSCREEN, SM_CYSCREEN};
+
+//Questo approccio è specifico per Windows
+pub fn get_screen_resolution() -> Option<(u32, u32)> {
+    unsafe {
+        // Usa le funzioni di WinAPI per ottenere la risoluzione dello schermo
+        let width = GetSystemMetrics(SM_CXSCREEN);
+        let height = GetSystemMetrics(SM_CYSCREEN);
+
+        if width > 0 && height > 0 {
+            Some((width as u32, height as u32))
+        } else {
+            None
+        }
+    }
+}
+
+//riprodurre suoni
+pub fn play_sound(file_path: &str) {
+    if let Ok(file) = File::open(file_path) {
+        let (_stream, stream_handle) = OutputStream::try_default().unwrap();
+        let source = Decoder::new(BufReader::new(file)).unwrap();
+        stream_handle.play_raw(source.convert_samples()).unwrap();
+        std::thread::sleep(std::time::Duration::from_secs(3));
+    } else {
+        println!("Errore: file audio non trovato o non apribile.");
+    }
+}
 
 #[derive(Deserialize, Debug)]
 struct Config {

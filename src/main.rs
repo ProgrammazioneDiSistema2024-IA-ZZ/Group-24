@@ -2,6 +2,8 @@ mod ui;
 mod utils;
 mod detector;
 mod transfer;
+mod confirm_sign;
+mod first_sign;
 
 use eframe::{egui, App, NativeOptions};
 use ui::BackupStatus;

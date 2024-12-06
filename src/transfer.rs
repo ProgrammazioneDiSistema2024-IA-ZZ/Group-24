@@ -1,5 +1,6 @@
 use crate::utils::manage_configuration_file;
 use crate::utils::Configuration;
+use crate::utils::play_sound;
 use std::fs;
 use std::io;
 use std::path::Path;
@@ -32,9 +33,14 @@ pub fn perform_backup() -> Result<(), String> {
         let include_all = backup_type == "total" || (backup_type == "custom" && file_types.len() == 0);
         let file_types: Vec<&str> = file_types.iter().map(|s| s.as_str()).collect();
 
+        //Riproduci suono inizio backup
+        play_sound("Sounds/bubblepop-254773.mp3");
+
         // Esegui il backup
         if let Err(e) = backup_folder(source_path, dest_path, include_all, &file_types) {
             return Err(format!("Backup failed: {}", e));
+        } else {
+            play_sound("Sounds/bellding-254774.mp3");
         }
 
         Ok(())
