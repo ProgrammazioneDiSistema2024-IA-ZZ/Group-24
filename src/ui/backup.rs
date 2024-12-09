@@ -2,7 +2,7 @@ use eframe::egui;
 use serde::Serialize;
 use crate::utils::manage_configuration_file;
 
-use super::{AppState, ErrorSource};
+use super::{AppState, ErrorSource, InfoSource};
 use toml;
 
 #[derive(Serialize)]
@@ -17,7 +17,7 @@ const MAX_FILE_TYPES: usize = 10;
 const MAX_EXTENSION_LENGTH: usize = 6; // Including the dot
 
 /// Display the backup panel and its related components
-pub fn show_backup_panel(ui: &mut egui::Ui, state: &mut AppState) {
+pub fn show_backup_panel(ui: &mut egui::Ui, state: &mut AppState, frame: &mut eframe::Frame) {
     // 1st row: Select source folder
     ui.horizontal(|ui| {
         ui.label("Select root source folder:");
@@ -154,34 +154,90 @@ pub fn show_backup_panel(ui: &mut egui::Ui, state: &mut AppState) {
             *state = AppState::new_from_config(config); // Reload from config file
         }
         if ui.button("Save").clicked() {
-            // Crea una versione semplificata con i campi che vogliamo serializzare
-            let config_to_save = ConfigToSave {
-                source_folder: state.source_folder.clone(),
-                destination_folder: state.destination_folder.clone(),
-                backup_type: state.backup_type.clone(),
-                file_types: state.file_types.clone(),
-            };
 
-            // Prova a serializzare lo stato in formato TOML e a salvare il file
-            match toml::to_string(&config_to_save) {
-                Ok(config) => {
-                    if let Err(e) = std::fs::write("config_build.toml", config) {
-                        state.error_message = Some(format!("Failed to save configuration: {}", e));
-                        state.error_source = Some(ErrorSource::SaveOperation);
-                        state.show_error_modal = true;
-                    } else {
-                        state.error_message = None; // Nessun errore, cancella eventuali messaggi precedenti
-                        state.error_source = None;
-                        state.show_error_modal = false;
-                    }
-                }
-                Err(e) => {
-                    state.error_message = Some(format!("Serialization error: {}", e));
-                    state.error_source = Some(ErrorSource::SaveOperation);
+            // Verifica che i percorsi non siano vuoti
+            if state.source_folder.is_empty() || state.destination_folder.is_empty() {
+                state.error_message = Some("Source or destination folder path cannot be empty.".to_string());
+                state.error_source = Some(ErrorSource::FileTypeValidation);
+                state.show_error_modal = true;
+                return;
+            }
+
+            // Verifica che le due cartelle siano diverse
+            if state.source_folder == state.destination_folder {
+                state.error_message = Some("Source and destination folders cannot be the same.".to_string());
+                state.error_source = Some(ErrorSource::FileTypeValidation);
+                state.show_error_modal = true;
+                return;
+            }
+
+            // Controlla se la cartella `source_folder` è vuota
+            if let Ok(entries) = std::fs::read_dir(&state.source_folder) {
+                if entries.count() == 0 {
+                    state.error_message = Some("Source folder is empty. Please ensure it contains files to back up.".to_string());
+                    state.error_source = Some(ErrorSource::FileTypeValidation);
                     state.show_error_modal = true;
+                    return;
+                }
+            } else {
+                state.error_message = Some("Failed to read source folder. Ensure it is accessible.".to_string());
+                state.error_source = Some(ErrorSource::FileTypeValidation);
+                state.show_error_modal = true;
+                return;
+            }
+
+            // Controlla se la cartella `destination_folder` contiene già dei file
+            if let Ok(entries) = std::fs::read_dir(&state.destination_folder) {
+                if entries.count() > 0 {
+                    state.info_message = Some("Destination folder is not empty. Existing files may be overwritten.".to_string());
+                    state.info_source = Some(InfoSource::Attention);
+                    state.show_info_modal = true;
+                    // Puoi decidere se interrompere qui o continuare con un messaggio informativo
+                    return;
                 }
             }
+
+            save_folders(state);
         }
+
+        ui.separator();
+
+        if ui.button("Minimize to background.").clicked() { 
+            frame.set_visible(false); 
+        } 
     });
     
+}
+
+pub fn save_folders(state: &mut AppState){
+    // Crea una versione semplificata con i campi che vogliamo serializzare
+    let config_to_save = ConfigToSave {
+        source_folder: state.source_folder.clone(),
+        destination_folder: state.destination_folder.clone(),
+        backup_type: state.backup_type.clone(),
+        file_types: state.file_types.clone(),
+    };
+
+    // Prova a serializzare lo stato in formato TOML e a salvare il file
+    match toml::to_string(&config_to_save) {
+        Ok(config) => {
+            if let Err(e) = std::fs::write("config_build.toml", config) {
+                state.error_message = Some(format!("Failed to save configuration: {}", e));
+                state.error_source = Some(ErrorSource::SaveOperation);
+                state.show_error_modal = true;
+            } else {
+                state.info_message = Some("Configuration saved successfully.".to_string());
+                state.info_source = Some(InfoSource::Success);
+                state.show_info_modal=true;
+                state.error_message = None; // Nessun errore, cancella eventuali messaggi precedenti
+                state.error_source = None;
+                state.show_error_modal = false;
+            }
+        }
+        Err(e) => {
+            state.error_message = Some(format!("Serialization error: {}", e));
+            state.error_source = Some(ErrorSource::SaveOperation);
+            state.show_error_modal = true;
+        }
+    }
 }

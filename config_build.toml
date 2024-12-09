@@ -1,4 +1,4 @@
-source_folder = 'C:\Users\rebec\OneDrive\Documenti\CV'
-destination_folder = 'C:\Users\rebec\OneDrive\Documenti\Nuova cartella'
-backup_type = "custom"
+source_folder = 'C:\Users\demol\Desktop\TEST'
+destination_folder = 'C:\Users\demol\Desktop\salvataggio'
+backup_type = "total"
 file_types = [".pdf"]
