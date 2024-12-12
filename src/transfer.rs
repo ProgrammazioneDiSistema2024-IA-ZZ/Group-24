@@ -57,10 +57,6 @@ fn backup_folder(
     include_all: bool,
     file_types: &[&str],
 ) -> io::Result<()> {
-    // Crea la cartella di destinazione, se non esiste
-    if !destination.exists() {
-        fs::create_dir_all(destination)?;
-    }
 
     // Itera sui file e sottocartelle nella sorgente
     for entry in fs::read_dir(source)? {

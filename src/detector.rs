@@ -1,4 +1,5 @@
 use rdev::{listen, EventType, Button};
+use std::sync::mpsc::Sender;
 use std::sync::{Arc, Mutex};
 use std::thread;
 use crate::transfer::perform_backup;
@@ -18,11 +19,12 @@ fn avvia_backup(shared_state: Arc<Mutex<AppState>>) {
     // Monitoraggio dello stato di avanzamento del backup...
     shared_state.lock().unwrap().backup_status = BackupStatus::InProgress;
 
-    let total_steps = 65;
+    // attesa fittizia
+    let total_steps = 30;
     for i in 1..=total_steps {
         thread::sleep(Duration::from_secs(1)); // Pausa di 1 secondo per step
-        if i % 10 == 0 {
-            println!("Backup in corso... {}%", i as f64 / total_steps as f64 * 100.0);
+        if i % 3 == 0 {
+            println!("Backup in corso... {}%", ((i as f64) / (total_steps as f64)) * 100.0);
         }
     }
 
@@ -36,7 +38,7 @@ fn avvia_backup(shared_state: Arc<Mutex<AppState>>) {
     }
 }
 
-pub fn run(shared_state: Arc<Mutex<AppState>>) {
+pub fn run(shared_state: Arc<Mutex<AppState>>, tx: Sender<String>) {
     let tolerance = 20.0; // Tolleranza
 
     let (screen_width, screen_height): (f64, f64) = match utils::get_screen_resolution() {
@@ -116,6 +118,18 @@ pub fn run(shared_state: Arc<Mutex<AppState>>) {
                     let line_tracker = horizontal_line_tracker_clone.lock().unwrap();
                     if line_tracker.is_valid_horizontal() {
                         println!("Linea orizzontale riconosciuta! Avvio del backup...");
+                        /* --- GESTIONE COMUNICAZIONE CON THREAD PRINCIPALE ---- */
+                        // fai apparire la GUI, per mostrare la schermata di backup in corso, o mostrare eventuali errori
+                        // Prova fino a 3 volte, in caso di condizione temporanea (improbabile nel caso di mpsc)
+                        for _ in 0..3 { 
+                            if tx.send("showGUI".to_string()).is_ok() {
+                                println!("Message sent successfully.");
+                                break;
+                            } else {
+                                eprintln!("Retrying to send the signal...");
+                                std::thread::sleep(std::time::Duration::from_millis(100));
+                            }
+                        }
                         avvia_backup(Arc::clone(&shared_state));
                         *waiting = false;
                     } else {

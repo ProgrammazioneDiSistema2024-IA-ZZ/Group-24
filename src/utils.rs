@@ -33,6 +33,7 @@ pub fn play_sound(file_path: &str) {
         stream_handle.play_raw(source.convert_samples()).unwrap();
         std::thread::sleep(std::time::Duration::from_secs(3));
     } else {
+        //in caso non sia possibile ripodurre il suono, l'erroe non viene considerato come fatale, quindi l'applicazione continua l'esecuzione
         println!("Errore: file audio non trovato o non apribile.");
     }
 }

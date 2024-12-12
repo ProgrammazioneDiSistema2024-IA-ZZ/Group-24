@@ -17,7 +17,7 @@ const MAX_FILE_TYPES: usize = 10;
 const MAX_EXTENSION_LENGTH: usize = 6; // Including the dot
 
 /// Display the backup panel and its related components
-pub fn show_backup_panel(ui: &mut egui::Ui, state: &mut AppState, frame: &mut eframe::Frame) {
+pub fn show_backup_panel(ui: &mut egui::Ui, state: &mut AppState) {
     // 1st row: Select source folder
     ui.horizontal(|ui| {
         ui.label("Select root source folder:");
@@ -155,10 +155,10 @@ pub fn show_backup_panel(ui: &mut egui::Ui, state: &mut AppState, frame: &mut ef
         }
         if ui.button("Save").clicked() {
 
-            // Verifica che i percorsi non siano vuoti
+            // Verifica che i percorsi a livello di stringa non siano vuoti
             if state.source_folder.is_empty() || state.destination_folder.is_empty() {
                 state.error_message = Some("Source or destination folder path cannot be empty.".to_string());
-                state.error_source = Some(ErrorSource::FileTypeValidation);
+                state.error_source = Some(ErrorSource::SaveOperation);
                 state.show_error_modal = true;
                 return;
             }
@@ -166,7 +166,7 @@ pub fn show_backup_panel(ui: &mut egui::Ui, state: &mut AppState, frame: &mut ef
             // Verifica che le due cartelle siano diverse
             if state.source_folder == state.destination_folder {
                 state.error_message = Some("Source and destination folders cannot be the same.".to_string());
-                state.error_source = Some(ErrorSource::FileTypeValidation);
+                state.error_source = Some(ErrorSource::SaveOperation);
                 state.show_error_modal = true;
                 return;
             }
@@ -175,13 +175,13 @@ pub fn show_backup_panel(ui: &mut egui::Ui, state: &mut AppState, frame: &mut ef
             if let Ok(entries) = std::fs::read_dir(&state.source_folder) {
                 if entries.count() == 0 {
                     state.error_message = Some("Source folder is empty. Please ensure it contains files to back up.".to_string());
-                    state.error_source = Some(ErrorSource::FileTypeValidation);
+                    state.error_source = Some(ErrorSource::SaveOperation);
                     state.show_error_modal = true;
                     return;
                 }
             } else {
                 state.error_message = Some("Failed to read source folder. Ensure it is accessible.".to_string());
-                state.error_source = Some(ErrorSource::FileTypeValidation);
+                state.error_source = Some(ErrorSource::SaveOperation);
                 state.show_error_modal = true;
                 return;
             }
@@ -199,17 +199,16 @@ pub fn show_backup_panel(ui: &mut egui::Ui, state: &mut AppState, frame: &mut ef
 
             save_folders(state);
         }
-
-        ui.separator();
-
-        if ui.button("Minimize to background.").clicked() { 
-            frame.set_visible(false); 
-        } 
     });
     
 }
 
 pub fn save_folders(state: &mut AppState){
+    // Se il backup scelto è di tipo "total" allora ripulisci file_types
+    if state.backup_type == "total" {
+        state.file_types.clear();
+    }
+
     // Crea una versione semplificata con i campi che vogliamo serializzare
     let config_to_save = ConfigToSave {
         source_folder: state.source_folder.clone(),
