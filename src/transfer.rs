@@ -52,13 +52,17 @@ pub fn perform_backup() -> Result<(), String> {
     }
 }
 
-/// Funzione ricorsiva per copiare i file dalla sorgente alla destinazione
+/// Funzione ricorsiva per copiare i file dalla sorgente alla destinazione.
 fn backup_folder(
     source: &Path,
     destination: &Path,
     include_all: bool,
     file_types: &[&str],
 ) -> io::Result<()> {
+    // Crea la directory di destinazione se non esiste
+    if !destination.exists() {
+        fs::create_dir_all(destination)?;
+    }
 
     // Itera sui file e sottocartelle nella sorgente
     for entry in fs::read_dir(source)? {
@@ -69,9 +73,11 @@ fn backup_folder(
         if path.is_dir() {
             // Esegui il backup ricorsivamente per le sottocartelle
             backup_folder(&path, &dest_path, include_all, file_types)?;
-        } else if include_all || matches_file_type(&path, file_types) {
+        } else if path.is_file() {
             // Copia il file se rientra nei criteri
-            fs::copy(&path, &dest_path)?;
+            if include_all || matches_file_type(&path, file_types) {
+                fs::copy(&path, &dest_path)?;
+            }
         }
     }
 
@@ -80,10 +86,12 @@ fn backup_folder(
 
 /// Controlla se un file corrisponde ai tipi specificati
 fn matches_file_type(file: &Path, file_types: &[&str]) -> bool {
-    if let Some(ext) = file.extension() {
-        let ext = ext.to_string_lossy();
-        file_types.iter().any(|&ft| ft == format!(".{}", ext))
+    //Estrazione dell'estensione:
+    if let Some(ext) = file.extension().and_then(|ext| ext.to_str()) {
+        //Confronto delle estensioni:
+        file_types.iter().any(|&ft| ft.eq_ignore_ascii_case(ext))
     } else {
         false
     }
 }
+
