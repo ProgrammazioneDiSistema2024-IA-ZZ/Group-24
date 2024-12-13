@@ -38,7 +38,9 @@ pub fn perform_backup() -> Result<(), String> {
 
         // Esegui il backup
         if let Err(e) = backup_folder(source_path, dest_path, include_all, &file_types) {
+            play_sound("Sounds/incorrect-buzzer-sound-147336.mp3");
             return Err(format!("Backup failed: {}", e));
+            
         } else {
             play_sound("Sounds/bellding-254774.mp3");
         }
