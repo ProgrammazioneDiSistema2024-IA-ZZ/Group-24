@@ -1,5 +1,6 @@
 use rdev::{listen, EventType, Button};
 use std::sync::mpsc::Sender;
+use std::sync::mpsc::Receiver;
 use std::sync::{Arc, Mutex};
 use std::thread;
 use crate::transfer::perform_backup;
@@ -15,7 +16,7 @@ struct ScreenResolution {
     height: f64,
 }
 
-fn avvia_backup(shared_state: Arc<Mutex<AppState>>) {
+pub fn avvia_backup(shared_state: Arc<Mutex<AppState>>) {
     // Monitoraggio dello stato di avanzamento del backup...
     shared_state.lock().unwrap().backup_status = BackupStatus::InProgress;
 
@@ -37,8 +38,7 @@ fn avvia_backup(shared_state: Arc<Mutex<AppState>>) {
         }
     }
 }
-
-pub fn run(shared_state: Arc<Mutex<AppState>>, tx: Sender<String>) {
+pub fn run(shared_state: Arc<Mutex<AppState>>, tx: Sender<String>, rx: Receiver<String>) {
     let tolerance = 20.0; // Tolleranza
 
     let (screen_width, screen_height): (f64, f64) = match utils::get_screen_resolution() {
@@ -64,12 +64,19 @@ pub fn run(shared_state: Arc<Mutex<AppState>>, tx: Sender<String>) {
     let waiting_for_confirmation = Arc::new(Mutex::new(false));
     let horizontal_line_tracker = Arc::new(Mutex::new(confirm_sign::HorizontalLineTracker::new()));
 
-    // Cloni per i thread
-    let edges_tracker_clone = Arc::clone(&edges_tracker);
-    let tracking_active_clone = Arc::clone(&tracking_active);
+    // Clone `waiting_for_confirmation` per usarlo nel thread
     let waiting_for_confirmation_clone = Arc::clone(&waiting_for_confirmation);
-    let horizontal_line_tracker_clone = Arc::clone(&horizontal_line_tracker);
-    let screen_resolution_clone = Arc::clone(&screen_resolution);
+
+    // Thread separato per ascoltare i messaggi su `rx`
+    std::thread::spawn(move || {
+        while let Ok(msg) = rx.recv() {
+            if msg == "resetWaiting" {
+                println!("Ricevuto messaggio: resetWaiting. Imposto waiting_for_confirmation a false.");
+                let mut waiting = waiting_for_confirmation_clone.lock().unwrap();
+                *waiting = false;
+            }
+        }
+    });
 
     // Parametro per definire quanti segmenti per lato verificare
     let segment_count = 20; // ad esempio 20 segmenti per lato
@@ -77,51 +84,64 @@ pub fn run(shared_state: Arc<Mutex<AppState>>, tx: Sender<String>) {
     if let Err(error) = listen(move |event| {
         match event.event_type {
             EventType::ButtonPress(Button::Left) => {
-                let mut tracking = tracking_active_clone.lock().unwrap();
-                let waiting = waiting_for_confirmation_clone.lock().unwrap();
+                let mut tracking = tracking_active.lock().unwrap();
+                let waiting = waiting_for_confirmation.lock().unwrap();
 
                 if !*waiting {
                     *tracking = true;
-                    let mut edges = edges_tracker_clone.lock().unwrap();
+                    let mut edges = edges_tracker.lock().unwrap();
                     edges.reset();
                     println!("Tracciamento del contorno iniziato (rettangolare)...");
                 } else {
                     // Reset del tracciamento della linea orizzontale
-                    let mut line_tracker = horizontal_line_tracker_clone.lock().unwrap();
+                    let mut line_tracker = horizontal_line_tracker.lock().unwrap();
                     line_tracker.reset();
                     println!("Inizio tracciamento della linea orizzontale di conferma.");
                 }
             }
             EventType::ButtonRelease(Button::Left) => {
-                let mut tracking = tracking_active_clone.lock().unwrap();
-                let mut waiting = waiting_for_confirmation_clone.lock().unwrap();
+                let mut tracking = tracking_active.lock().unwrap();
+                let mut waiting = waiting_for_confirmation.lock().unwrap();
                 *tracking = false;
 
                 // Ottieni larghezza/altezza
-                let resolution = screen_resolution_clone.lock().unwrap();
+                let resolution = screen_resolution.lock().unwrap();
                 let screen_width = resolution.width;
                 let screen_height = resolution.height;
 
                 if !*waiting {
-                    let edges = edges_tracker_clone.lock().unwrap();
-                    
+                    let edges = edges_tracker.lock().unwrap();
+
                     // Qui usiamo la nuova funzione anziché all_edges_touched()
                     if edges.is_contour_complete(screen_width, screen_height, segment_count) {
                         utils::play_sound("Sounds/system-notification-199277.mp3");
+                        {
+                            let mut state = shared_state.lock().unwrap();
+                            state.backup_status = BackupStatus::ToConfirm; // Passa allo stato di conferma
+                        }
                         println!("Contorno completo riconosciuto! Disegna una linea orizzontale per confermare e avviare il backup.");
+                        for _ in 0..3 {
+                            if tx.send("showGUI".to_string()).is_ok() {
+                                println!("Message sent successfully.");
+                                break;
+                            } else {
+                                eprintln!("Retrying to send the signal...");
+                                std::thread::sleep(std::time::Duration::from_millis(100));
+                            }
+                        }
                         *waiting = true;
                     } else {
                         println!("Contorno non completo. Riprova disegnando il perimetro completo dello schermo.");
                     }
                 } else {
                     // Controlla se è stata disegnata una linea orizzontale
-                    let line_tracker = horizontal_line_tracker_clone.lock().unwrap();
+                    let line_tracker = horizontal_line_tracker.lock().unwrap();
                     if line_tracker.is_valid_horizontal() {
                         println!("Linea orizzontale riconosciuta! Avvio del backup...");
                         /* --- GESTIONE COMUNICAZIONE CON THREAD PRINCIPALE ---- */
                         // fai apparire la GUI, per mostrare la schermata di backup in corso, o mostrare eventuali errori
                         // Prova fino a 3 volte, in caso di condizione temporanea (improbabile nel caso di mpsc)
-                        for _ in 0..3 { 
+                        for _ in 0..3 {
                             if tx.send("showGUI".to_string()).is_ok() {
                                 println!("Message sent successfully.");
                                 break;
@@ -139,8 +159,8 @@ pub fn run(shared_state: Arc<Mutex<AppState>>, tx: Sender<String>) {
             }
             EventType::MouseMove { x, y } => {
                 let tracking = tracking_active.lock().unwrap();
-                let waiting = waiting_for_confirmation_clone.lock().unwrap();
-                let resolution = screen_resolution_clone.lock().unwrap();
+                let waiting = waiting_for_confirmation.lock().unwrap();
+                let resolution = screen_resolution.lock().unwrap();
                 let screen_width = resolution.width;
                 let screen_height = resolution.height;
 
