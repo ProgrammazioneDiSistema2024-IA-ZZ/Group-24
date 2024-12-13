@@ -86,12 +86,20 @@ fn backup_folder(
 
 /// Controlla se un file corrisponde ai tipi specificati
 fn matches_file_type(file: &Path, file_types: &[&str]) -> bool {
-    //Estrazione dell'estensione:
+    // Estrazione dell'estensione:
     if let Some(ext) = file.extension().and_then(|ext| ext.to_str()) {
-        //Confronto delle estensioni:
-        file_types.iter().any(|&ft| ft.eq_ignore_ascii_case(ext))
+        // Aggiungi il punto all'estensione estratta se non c'è
+        let ext_with_dot = if ext.starts_with('.') {
+            ext.to_string() // L'estensione ha già il punto, la manteniamo invariata
+        } else {
+            format!(".{}", ext) // Aggiungiamo il punto se non presente
+        };
+
+        // Confronto delle estensioni:
+        file_types.iter().any(|&ft| ft.eq_ignore_ascii_case(&ext_with_dot))
     } else {
         false
     }
 }
+
 
