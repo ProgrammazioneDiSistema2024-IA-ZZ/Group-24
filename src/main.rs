@@ -4,6 +4,7 @@ mod first_sign;
 mod transfer;
 mod ui;
 mod utils;
+mod analytics;
 
 use crate::ui::{AppState, MyApp};
 use eframe::{egui, App, NativeOptions};

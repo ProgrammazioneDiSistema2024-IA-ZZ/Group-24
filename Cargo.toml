@@ -16,3 +16,7 @@ rdev = "0.5.3"
 rfd = "0.13" # File dialog libraryserde = { version = "1.0", features = ["derive"] }
 toml = "0.7" # TOML parsing and serializationwinapi = { version = "0.3", features = ["windef", "winuser"] }
 screen = "0.1.0"
+chrono = "0.4"
+systemstat = "0.1"
+
+

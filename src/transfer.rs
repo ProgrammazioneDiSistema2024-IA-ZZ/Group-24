@@ -1,9 +1,13 @@
 use crate::utils::manage_configuration_file;
 use crate::utils::Configuration;
 use crate::utils::play_sound;
+use crate::analytics::log_backup_data_to_csv;
+use systemstat::{System, Platform};
 use std::fs;
 use std::io;
 use std::path::Path;
+use std::time::Instant;
+
 
 /// Esegue il backup dei file dalla sorgente alla destinazione
 pub fn perform_backup() -> Result<(), String> {
@@ -33,6 +37,9 @@ pub fn perform_backup() -> Result<(), String> {
         let include_all = backup_type == "total" || (backup_type == "custom" && file_types.len() == 0);
         let file_types: Vec<&str> = file_types.iter().map(|s| s.as_str()).collect();
 
+        // Calcola la durata del backup
+        let start_time = Instant::now();
+
         //Riproduci suono inizio backup
         play_sound("Sounds/bubblepop-254773.mp3");
 
@@ -43,6 +50,11 @@ pub fn perform_backup() -> Result<(), String> {
             
         } else {
             play_sound("Sounds/bellding-254774.mp3");
+            let duration = start_time.elapsed().as_secs(); // Durata del backup in secondi
+            let total_size = get_total_size(source_path).map_err(|e| e.to_string())?; // Calcola i dati trasferiti in byte
+            // Registra i dettagli del backup nelle analitiche
+            let cpu_usage = get_cpu_usage();
+            log_backup_data_to_csv(total_size, duration, cpu_usage);
         }
 
         Ok(())
@@ -101,5 +113,45 @@ fn matches_file_type(file: &Path, file_types: &[&str]) -> bool {
         false
     }
 }
+
+fn get_total_size(path: &Path) -> io::Result<u64> {
+    let mut total_size = 0;
+
+    if path.is_dir() {
+        for entry in fs::read_dir(path)? {
+            let entry = entry?;
+            let entry_path = entry.path();
+            if entry_path.is_file() {
+                total_size += entry_path.metadata()?.len();
+            } else if entry_path.is_dir() {
+                total_size += get_total_size(&entry_path)?;
+            }
+        }
+    }
+
+    Ok(total_size)
+}
+
+
+
+fn get_cpu_usage() -> f32 {
+    let sys = System::new();
+    match sys.cpu_load_aggregate() {
+        Ok(cpu) => {
+            // Attendi un secondo per calcolare il carico
+            std::thread::sleep(std::time::Duration::from_secs(1));
+            match cpu.done() {
+                Ok(cpu_load) => {
+                    // Calcola il carico totale come somma dei consumi utente e di sistema
+                    let usage = (cpu_load.user + cpu_load.system) * 100.0;
+                    usage
+                }
+                Err(_) => 0.0, // Se fallisce, restituisci 0.0
+            }
+        }
+        Err(_) => 0.0, // Se fallisce, restituisci 0.0
+    }
+}
+
 
 
