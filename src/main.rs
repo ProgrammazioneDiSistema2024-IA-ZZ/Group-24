@@ -14,9 +14,19 @@ use ui::BackupStatus;
 use utils::load_image_as_icon;
 use utils::manage_configuration_file;
 use utils::Configuration;
+use analytics::log_cpu_usage_to_csv;
+use std::thread;
 //use single_instance::SingleInstance;
 
 fn main() -> Result<(), eframe::Error> {
+
+    // Avvia il logging della CPU in un thread separato
+    thread::spawn(move || {
+        log_cpu_usage_to_csv();  // Avvia la funzione di logging della CPU
+    });
+
+
+
     /* SINGOLA APPLICAZIONE - NON FUNZIONA*/
     /* let instance = SingleInstance::new("unique_program_identifier");
     match instance {
@@ -37,6 +47,7 @@ fn main() -> Result<(), eframe::Error> {
     // Ottieni la configurazione
     let config = manage_configuration_file();
 
+    
     // Crea un `Arc<Mutex<AppState>>` condiviso
     let shared_state = Arc::new(Mutex::new(match &config {
         Configuration::Error => {
