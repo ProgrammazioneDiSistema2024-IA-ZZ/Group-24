@@ -1,7 +1,7 @@
 pub mod analytics;
 pub mod backup;
 pub mod info;
-
+use std::sync::mpsc::Sender;
 use backup::save_folders;
 use eframe::egui::{self, Color32};
 use serde::Serialize;
@@ -36,6 +36,7 @@ pub enum InfoSource {
 #[derive(Serialize, PartialEq, Eq, Clone, Debug)]
 pub enum BackupStatus {
     NotStarted,
+    ToConfirm,
     InProgress,
     CompletedSuccess,
     CompletedError(String),
@@ -64,11 +65,12 @@ pub struct AppState {
 
 pub struct MyApp {
     pub state: Arc<Mutex<AppState>>,
+    pub tx1: Sender<String>, // Aggiungi tx1 per inviare messaggi al decoder
 }
 
 impl MyApp {
-    pub fn new(state: Arc<Mutex<AppState>>) -> Self {
-        MyApp { state }
+    pub fn new(state: Arc<Mutex<AppState>>, tx1: Sender<String>) -> Self {
+        MyApp { state, tx1 }
     }
 }
 
@@ -378,6 +380,10 @@ pub fn show_backup_window(ctx: &egui::Context, state: &mut MyApp) {
 
     // Determina il titolo e il messaggio in base allo stato del backup
     let (title, message, show_return_button) = match backup_status {
+        BackupStatus::ToConfirm => (
+            "Backup ready",
+            "The backup is ready",
+            false,), // Non mostrare la finestra se il backup non è iniziato
         BackupStatus::InProgress => (
             "Backup In Progress",
             "The backup is currently running...",
@@ -387,7 +393,8 @@ pub fn show_backup_window(ctx: &egui::Context, state: &mut MyApp) {
             ("Backup Completed", "Backup completed successfully!", true)
         }
         BackupStatus::CompletedError(ref err) => ("Backup Failed", err.as_str(), true),
-        BackupStatus::NotStarted => return, // Non mostrare la finestra se il backup non è iniziato
+        BackupStatus::NotStarted => return,
+        
     };
 
     // Disegna il pannello centrale
@@ -408,6 +415,36 @@ pub fn show_backup_window(ctx: &egui::Context, state: &mut MyApp) {
                     state.backup_status = BackupStatus::NotStarted;
                 }
             }
+        });
+    });
+}
+pub fn confirmation_window(ctx: &egui::Context, state: &mut MyApp) {
+    
+
+    // Mostra la finestra solo se lo stato è `ToConfirm`
+    egui::CentralPanel::default().show(ctx, |ui| {
+        ui.vertical_centered(|ui| {
+            ui.heading("Backup Confirmation"); // Titolo
+            ui.separator(); // Separatore
+            ui.label("Do you want to start the backup?"); // Messaggio principale
+
+            // Crea uno spazio tra il messaggio e i pulsanti
+            ui.add_space(20.0);
+
+            // Posiziona i pulsanti centrati orizzontalmente
+            
+            if ui.button("No").clicked() {
+                println!("no");
+                if state.tx1.send("resetWaiting".to_string()).is_err() {
+                    eprintln!("Failed to send message to decoder.");
+                }
+                let mut state = state.state.lock().unwrap();
+                state.backup_status = BackupStatus::NotStarted;
+            }
+            if ui.button("Yes").clicked() {
+                println!("si");
+            }
+            
         });
     });
 }

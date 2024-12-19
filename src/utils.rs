@@ -25,19 +25,20 @@ pub fn get_screen_resolution() -> Option<(u32, u32)> {
     }
 }
 
-//riprodurre suoni
 pub fn play_sound(file_path: &str) {
-    if let Ok(file) = File::open(file_path) {
-        let (_stream, stream_handle) = OutputStream::try_default().unwrap();
-        let source = Decoder::new(BufReader::new(file)).unwrap();
-        stream_handle.play_raw(source.convert_samples()).unwrap();
-        std::thread::sleep(std::time::Duration::from_secs(3));
-    } else {
-        //in caso non sia possibile ripodurre il suono, l'erroe non viene considerato come fatale, quindi l'applicazione continua l'esecuzione
-        println!("Errore: file audio non trovato o non apribile.");
-    }
+    let file_path = file_path.to_string(); // Copia file_path in una String
+    std::thread::spawn(move || {
+        if let Ok(file) = File::open(&file_path) {
+            let (_stream, stream_handle) = OutputStream::try_default().unwrap();
+            let source = Decoder::new(BufReader::new(file)).unwrap();
+            let duration = source.total_duration().unwrap_or_else(|| std::time::Duration::from_secs(3));
+            stream_handle.play_raw(source.convert_samples()).unwrap();
+            std::thread::sleep(duration); // Mantieni il thread attivo
+        } else {
+            println!("Errore: file audio non trovato o non apribile.");
+        }
+    });
 }
-
 #[derive(Deserialize, Debug)]
 struct Config {
     source_folder: String,

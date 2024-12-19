@@ -33,7 +33,7 @@ fn main() -> Result<(), eframe::Error> {
     } */
 
     let (tx, rx) = mpsc::channel::<String>(); // Canale per comunicazione
-
+    let (tx1, rx1) = mpsc::channel::<String>(); // Canale per comunicazion
     // Ottieni la configurazione
     let config = manage_configuration_file();
 
@@ -71,11 +71,11 @@ fn main() -> Result<(), eframe::Error> {
     let detector_state = Arc::clone(&shared_state);
     // Cloniamo il trasmettitore per il detector
     let detector_tx = tx.clone(); 
-
+    
     // Avvia il detector in un thread separato
     std::thread::spawn(move || {
         println!("Starting detector...");
-        detector::run(detector_state, detector_tx);
+        detector::run(detector_state, detector_tx,rx1);
     });
 
     let run_gui;
@@ -86,9 +86,9 @@ fn main() -> Result<(), eframe::Error> {
 
     if run_gui {
         println!("GUI started for the first time.");
-
+        let gui_tx = tx1.clone(); 
         let options_for_gui = options.clone();
-        let my_app = MyApp::new(Arc::clone(&shared_state));
+        let my_app = MyApp::new(Arc::clone(&shared_state),gui_tx);
         eframe::run_native(
             "Group 24 - Backup Application",
             options_for_gui,
@@ -126,9 +126,9 @@ fn main() -> Result<(), eframe::Error> {
             //Print for debug
             //shared_state.lock().unwrap().pretty_print();
         }
-
+        let gui_tx = tx1.clone(); 
         let options_for_gui = options.clone();  // Clone options here
-        let my_app = MyApp::new(Arc::clone(&shared_state));
+        let my_app = MyApp::new(Arc::clone(&shared_state),gui_tx);
         eframe::run_native(
             "Group 24 - Backup Application",
             options_for_gui,
@@ -158,7 +158,11 @@ impl App for MyApp {
         // Mostra il pannello principale o la finestra del backup
         if backup_status == BackupStatus::NotStarted {
             ui::main_panel(ctx, self)
-        } else {
+        }
+         else if  backup_status == BackupStatus::ToConfirm{
+            ui::confirmation_window(ctx, self);
+        }
+        else {
             ui::show_backup_window(ctx, self);
         }
 
