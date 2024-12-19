@@ -18,5 +18,4 @@ toml = "0.7" # TOML parsing and serializationwinapi = { version = "0.3", feature
 screen = "0.1.0"
 chrono = "0.4"
 systemstat = "0.1"
-
-
+sha2 = "0.10"
