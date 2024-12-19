@@ -8,19 +8,47 @@ use serde::Deserialize;
 use rodio::{Decoder, OutputStream, source::Source};
 use std::fs::File;
 use std::io::BufReader;
+#[cfg(windows)]
 use winapi::um::winuser::{GetSystemMetrics, SM_CXSCREEN, SM_CYSCREEN};
+#[cfg(linux)]
+extern crate x11;
+#[cfg(linux)]
+use x11::xlib;
+
+use std::ptr;
 
 //Questo approccio è specifico per Windows
 pub fn get_screen_resolution() -> Option<(u32, u32)> {
-    unsafe {
-        // Usa le funzioni di WinAPI per ottenere la risoluzione dello schermo
-        let width = GetSystemMetrics(SM_CXSCREEN);
-        let height = GetSystemMetrics(SM_CYSCREEN);
+    #[cfg(windows)]
+    {
+        unsafe {
+            // Usa le funzioni di WinAPI per ottenere la risoluzione dello schermo
+            let width = GetSystemMetrics(SM_CXSCREEN);
+            let height = GetSystemMetrics(SM_CYSCREEN);
 
-        if width > 0 && height > 0 {
-            Some((width as u32, height as u32))
-        } else {
-            None
+            if width > 0 && height > 0 {
+                Some((width as u32, height as u32))
+            } else {
+                None
+            }
+        }
+    }
+    #[cfg(linux)]
+    {
+        unsafe {
+            // Usa le X11 API per ottenere la risoluzione dello schermo su Linux
+            let display = xlib::XOpenDisplay(ptr::null());
+            if display.is_null() {
+                return None; // Se non riesce a ottenere il display, ritorna None
+            }
+
+            let screen = xlib::XDefaultScreen(display);
+            let width = xlib::XDisplayWidth(display, screen) as u32;
+            let height = xlib::XDisplayHeight(display, screen) as u32;
+
+            xlib::XCloseDisplay(display); // Chiudi il display dopo l'uso
+
+            Some((width, height))
         }
     }
 }
