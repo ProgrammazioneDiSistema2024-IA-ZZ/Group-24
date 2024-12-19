@@ -1,13 +1,14 @@
-use crate::utils::manage_configuration_file;
-use crate::utils::Configuration;
-use crate::utils::play_sound;
 use crate::analytics::log_backup_data_to_csv;
-use systemstat::{System, Platform};
+use crate::utils::manage_configuration_file;
+use crate::utils::play_sound;
+use crate::utils::Configuration;
+use sha2::{Digest, Sha256};
 use std::fs;
-use std::io;
+use std::fs::File;
+use std::io::{self, Read};
 use std::path::Path;
 use std::time::Instant;
-
+use systemstat::{Platform, System};
 
 /// Esegue il backup dei file dalla sorgente alla destinazione
 pub fn perform_backup() -> Result<(), String> {
@@ -15,7 +16,8 @@ pub fn perform_backup() -> Result<(), String> {
     let config = manage_configuration_file();
 
     // Verifica se config è di tipo Configuration::Build
-    if let Configuration::Build(source_folder, destination_folder, backup_type, file_types) = config {
+    if let Configuration::Build(source_folder, destination_folder, backup_type, file_types) = config
+    {
         // Salva i campi in variabili
         let source_folder = source_folder; // String
         let destination_folder = destination_folder; // String
@@ -27,14 +29,21 @@ pub fn perform_backup() -> Result<(), String> {
 
         // Verifica che le cartelle esistano
         if !source_path.is_dir() {
-            return Err(format!("Source folder: `{}` does not exist.", source_folder));
+            return Err(format!(
+                "Source folder: `{}` does not exist.",
+                source_folder
+            ));
         }
         if !dest_path.is_dir() {
-            return Err(format!("Destination folder: `{}` does not exist.", destination_folder));
+            return Err(format!(
+                "Destination folder: `{}` does not exist.",
+                destination_folder
+            ));
         }
 
         // Determina i tipi di file da includere
-        let include_all = backup_type == "total" || (backup_type == "custom" && file_types.len() == 0);
+        let include_all =
+            backup_type == "total" || (backup_type == "custom" && file_types.len() == 0);
         let file_types: Vec<&str> = file_types.iter().map(|s| s.as_str()).collect();
 
         // Calcola la durata del backup
@@ -47,20 +56,21 @@ pub fn perform_backup() -> Result<(), String> {
         if let Err(e) = backup_folder(source_path, dest_path, include_all, &file_types) {
             play_sound("Sounds/incorrect-buzzer-sound-147336.mp3");
             return Err(format!("Backup failed: {}", e));
-            
         } else {
             play_sound("Sounds/bellding-254774.mp3");
             let duration = start_time.elapsed().as_secs(); // Durata del backup in secondi
             let total_size = get_total_size(source_path).map_err(|e| e.to_string())?; // Calcola i dati trasferiti in byte
-            // Registra i dettagli del backup nelle analitiche
+                                                                                      // Registra i dettagli del backup nelle analitiche
             let cpu_usage = get_cpu_usage();
             log_backup_data_to_csv(total_size, duration, cpu_usage);
         }
 
         Ok(())
-    }
-    else {
-        return Err("Configurazione non valida. Imposta una configurazione valida dal pannello di Backup!".to_string())
+    } else {
+        return Err(
+            "Configurazione non valida. Imposta una configurazione valida dal pannello di Backup!"
+                .to_string(),
+        );
     }
 }
 
@@ -90,6 +100,13 @@ fn backup_folder(
             if include_all || matches_file_type(&path, file_types) {
                 fs::copy(&path, &dest_path)?;
             }
+            // Controlla l'integrità del file copiato
+            if !verify_file_integrity(&path, &dest_path)? {
+                return Err(io::Error::new(
+                    io::ErrorKind::Other,
+                    format!("File corrotto: {:?}", path),
+                ));
+            }
         }
     }
 
@@ -108,7 +125,9 @@ fn matches_file_type(file: &Path, file_types: &[&str]) -> bool {
         };
 
         // Confronto delle estensioni:
-        file_types.iter().any(|&ft| ft.eq_ignore_ascii_case(&ext_with_dot))
+        file_types
+            .iter()
+            .any(|&ft| ft.eq_ignore_ascii_case(&ext_with_dot))
     } else {
         false
     }
@@ -132,8 +151,6 @@ fn get_total_size(path: &Path) -> io::Result<u64> {
     Ok(total_size)
 }
 
-
-
 fn get_cpu_usage() -> f32 {
     let sys = System::new();
     match sys.cpu_load_aggregate() {
@@ -153,5 +170,27 @@ fn get_cpu_usage() -> f32 {
     }
 }
 
+/// Verifica l'integrità del file copiato confrontando gli hash SHA256
+fn verify_file_integrity(source: &Path, destination: &Path) -> io::Result<bool> {
+    let source_hash = calculate_file_hash(source)?;
+    let destination_hash = calculate_file_hash(destination)?;
 
+    Ok(source_hash == destination_hash)
+}
 
+/// Calcola l'hash SHA256 di un file
+fn calculate_file_hash(file_path: &Path) -> io::Result<String> {
+    let mut file = File::open(file_path)?;
+    let mut hasher = Sha256::new();
+    let mut buffer = [0u8; 1024];
+
+    loop {
+        let bytes_read = file.read(&mut buffer)?;
+        if bytes_read == 0 {
+            break;
+        }
+        hasher.update(&buffer[..bytes_read]);
+    }
+
+    Ok(format!("{:x}", hasher.finalize()))
+}

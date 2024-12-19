@@ -1,4 +1,4 @@
-source_folder = 'C:\Users\jannu\Desktop\source'
-destination_folder = 'C:\Users\jannu\Desktop\destination'
+source_folder = 'C:\Users\demol\Desktop\TEST'
+destination_folder = 'C:\Users\demol\Desktop\salvataggio'
 backup_type = "total"
 file_types = []
