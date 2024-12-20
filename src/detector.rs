@@ -20,14 +20,14 @@ pub fn avvia_backup(shared_state: Arc<Mutex<AppState>>) {
     // Monitoraggio dello stato di avanzamento del backup...
     shared_state.lock().unwrap().backup_status = BackupStatus::InProgress;
 
-    // attesa fittizia
-    let total_steps = 30;
-    for i in 1..=total_steps {
-        thread::sleep(Duration::from_secs(1)); // Pausa di 1 secondo per step
-        if i % 3 == 0 {
-            println!("Backup in corso... {}%", ((i as f64) / (total_steps as f64)) * 100.0);
-        }
-    }
+    // // attesa fittizia
+    // let total_steps = 10;
+    // for i in 1..=total_steps {
+    //     thread::sleep(Duration::from_secs(1)); // Pausa di 1 secondo per step
+    //     if i % 3 == 0 {
+    //         println!("Backup in corso... {}%", ((i as f64) / (total_steps as f64)) * 100.0);
+    //     }
+    // }
 
     match perform_backup() {
         Ok(_) => {
@@ -39,7 +39,7 @@ pub fn avvia_backup(shared_state: Arc<Mutex<AppState>>) {
     }
 }
 pub fn run(shared_state: Arc<Mutex<AppState>>, tx: Sender<String>, rx: Receiver<String>) {
-    let tolerance = 20.0; // Tolleranza
+    let tolerance = 30.0; // Tolleranza
 
     let (screen_width, screen_height): (f64, f64) = match utils::get_screen_resolution() {
         Some((w, h)) => {
@@ -120,15 +120,23 @@ pub fn run(shared_state: Arc<Mutex<AppState>>, tx: Sender<String>, rx: Receiver<
                             state.backup_status = BackupStatus::ToConfirm; // Passa allo stato di conferma
                         }
                         println!("Contorno completo riconosciuto! Disegna una linea orizzontale per confermare e avviare il backup.");
-                        for _ in 0..3 {
-                            if tx.send("showGUI".to_string()).is_ok() {
-                                println!("Message sent successfully.");
-                                break;
+
+                        {
+                            let mut state = shared_state.lock().unwrap();
+                            if !state.display {
+                                // Se la GUI non è aperta, aggiorna lo stato e invia il messaggio
+                                if let Err(err) = tx.send("showGUI".to_string()) {
+                                    eprintln!("Failed to send message: {}", err);
+                                    // Ripristina lo stato in caso di errore nell'invio del messaggio
+                                    state.display = false;
+                                } else {
+                                    println!("Message sent successfully.");
+                                }
                             } else {
-                                eprintln!("Retrying to send the signal...");
-                                std::thread::sleep(std::time::Duration::from_millis(100));
+                                println!("GUI already active. Skipping message.");
                             }
                         }
+
                         *waiting = true;
                     } else {
                         println!("Contorno non completo. Riprova disegnando il perimetro completo dello schermo.");
@@ -141,15 +149,23 @@ pub fn run(shared_state: Arc<Mutex<AppState>>, tx: Sender<String>, rx: Receiver<
                         /* --- GESTIONE COMUNICAZIONE CON THREAD PRINCIPALE ---- */
                         // fai apparire la GUI, per mostrare la schermata di backup in corso, o mostrare eventuali errori
                         // Prova fino a 3 volte, in caso di condizione temporanea (improbabile nel caso di mpsc)
-                        for _ in 0..3 {
-                            if tx.send("showGUI".to_string()).is_ok() {
-                                println!("Message sent successfully.");
-                                break;
+
+                        {
+                            let mut state = shared_state.lock().unwrap();
+                            if !state.display {
+                                // Se la GUI non è aperta, aggiorna lo stato e invia il messaggio
+                                if let Err(err) = tx.send("showGUI".to_string()) {
+                                    eprintln!("Failed to send message: {}", err);
+                                    // Ripristina lo stato in caso di errore nell'invio del messaggio
+                                    state.display = false;
+                                } else {
+                                    println!("Message sent successfully.");
+                                }
                             } else {
-                                eprintln!("Retrying to send the signal...");
-                                std::thread::sleep(std::time::Duration::from_millis(100));
+                                println!("GUI already active. Skipping message.");
                             }
                         }
+                    
                         avvia_backup(Arc::clone(&shared_state));
                         *waiting = false;
                     } else {
