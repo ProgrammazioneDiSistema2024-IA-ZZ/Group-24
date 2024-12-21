@@ -92,20 +92,26 @@ fn backup_folder(
         let path = entry.path();
         let dest_path = destination.join(entry.file_name());
 
+        println!("Processing: {:?}", path);
         if path.is_dir() {
+            println!("Entering directory: {:?}", path);
             // Esegui il backup ricorsivamente per le sottocartelle
             backup_folder(&path, &dest_path, include_all, file_types)?;
         } else if path.is_file() {
             // Copia il file se rientra nei criteri
             if include_all || matches_file_type(&path, file_types) {
+                println!("Copying file: {:?} -> {:?}", path, dest_path);
                 fs::copy(&path, &dest_path)?;
-            }
-            // Controlla l'integrità del file copiato
-            if !verify_file_integrity(&path, &dest_path)? {
-                return Err(io::Error::new(
-                    io::ErrorKind::Other,
-                    format!("File corrotto: {:?}", path),
-                ));
+
+                // Controlla l'integrità del file copiato
+                if !verify_file_integrity(&path, &dest_path)? {
+                    return Err(io::Error::new(
+                        io::ErrorKind::Other,
+                        format!("File corrotto: {:?}", path),
+                    ));
+                }
+            } else {
+                println!("Skipping file: {:?}", path);
             }
         }
     }

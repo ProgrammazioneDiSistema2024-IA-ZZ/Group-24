@@ -170,9 +170,6 @@ impl App for MyApp {
         if backup_status == BackupStatus::NotStarted {
             ui::main_panel(ctx, self)
         }
-         else if  backup_status == BackupStatus::ToConfirm{
-            ui::confirmation_window(ctx, self);
-        }
         else {
             ui::show_backup_window(ctx, self);
         }

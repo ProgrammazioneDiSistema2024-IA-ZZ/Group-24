@@ -3,7 +3,7 @@ pub mod backup;
 pub mod info;
 use std::sync::mpsc::Sender;
 use backup::save_folders;
-use eframe::egui::{self, Color32};
+use eframe::egui::{self, Color32, Ui};
 use serde::Serialize;
 
 use std::{
@@ -197,8 +197,8 @@ fn render_sidebar(ctx: &egui::Context, state: &mut AppState) {
             // Spacer to push "Stop" to the bottom
             ui.add_space(ui.available_height() - 50.0);
 
-            // Render the "Stop" button at the bottom, visually separated from the menu
-            if ui.button("Stop").clicked() {
+            // Render the "Terminate" button at the bottom, visually separated from the menu
+            if ui.button("Terminate").clicked() {
                 println!("End of the program");
                 process::exit(0); // Terminate the application: halts execution and bypasses Rust's usual stack unwinding mechanism.
             }
@@ -374,16 +374,23 @@ pub fn exit_panel(ctx: &egui::Context, state: &MyApp, error_message: &str) {
 }
 
 pub fn show_backup_window(ctx: &egui::Context, state: &mut MyApp) {
-    let mut state = state.state.lock().unwrap();
-    // Copia il valore di backup_status in una variabile separata
-    let backup_status = state.backup_status.clone();
+    let backup_status;
+    let show_confirmation_modal;
+    {
+        let app_state = state.state.lock().unwrap();
+        // Copia il valore di backup_status in una variabile separata
+        backup_status = app_state.backup_status.clone();
+        show_confirmation_modal = app_state.show_confirmation_modal.clone();
+    }
+    
 
     // Determina il titolo e il messaggio in base allo stato del backup
     let (title, message, show_return_button) = match backup_status {
         BackupStatus::ToConfirm => (
-            "Backup ready",
-            "The backup is ready",
-            false,), // Non mostrare la finestra se il backup non è iniziato
+            "Backup Confirmation",
+            "To start the backup service draw a horitzontal line.",
+            true,
+        ),
         BackupStatus::InProgress => (
             "Backup In Progress",
             "The backup is currently running...",
@@ -400,51 +407,56 @@ pub fn show_backup_window(ctx: &egui::Context, state: &mut MyApp) {
     // Disegna il pannello centrale
     egui::CentralPanel::default().show(ctx, |ui| {
         ui.vertical_centered(|ui| {
-            if state.show_confirmation_modal  {
+
+            if show_confirmation_modal  {
                 ui.set_enabled(false);
             }
 
             ui.heading(title); // Titolo
             ui.separator(); // Separatore
             ui.label(message); // Messaggio principale
+            if backup_status == BackupStatus::ToConfirm {
+                ui.label("Otherwise, press the button below to cancel the backup routine.");
+            }
+
+            /* Gestione schermata per backup in progress */
+            if backup_status == BackupStatus::InProgress {
+                render_backup_progress(ui, state);
+            }
+
+            ui.add_space(20.0);
 
             // Mostra il pulsante "Return back" se necessario
             if show_return_button {
                 if ui.button("Return back").clicked() {
+
+                    if backup_status == BackupStatus::ToConfirm {
+                        if state.tx1.send("resetWaiting".to_string()).is_err() {
+                            eprintln!("Failed to send message to decoder.");
+                        }
+                    }
                     // Aggiorna lo stato solo quando il pulsante viene cliccato
-                    state.backup_status = BackupStatus::NotStarted;
+                    let mut app_state = state.state.lock().unwrap();
+                    app_state.backup_status = BackupStatus::NotStarted;
                 }
             }
         });
     });
 }
-pub fn confirmation_window(ctx: &egui::Context, state: &mut MyApp) {
-    
 
-    // Mostra la finestra solo se lo stato è `ToConfirm`
-    egui::CentralPanel::default().show(ctx, |ui| {
-        ui.vertical_centered(|ui| {
-            ui.heading("Backup Confirmation"); // Titolo
-            ui.separator(); // Separatore
-            ui.label("Do you want to start the backup?"); // Messaggio principale
+fn render_backup_progress(ui: &mut Ui, state: &mut MyApp) {
+    ui.add_space(10.0);
+    ui.label("Click \"Stop\" to abort the backup");
 
-            // Crea uno spazio tra il messaggio e i pulsanti
-            ui.add_space(20.0);
+    if ui.button("Stop").clicked() {
+        //Segnala al thread "backup" di terminare la procedura
+        //todo
 
-            // Posiziona i pulsanti centrati orizzontalmente
-            
-            if ui.button("No").clicked() {
-                println!("no");
-                if state.tx1.send("resetWaiting".to_string()).is_err() {
-                    eprintln!("Failed to send message to decoder.");
-                }
-                let mut state = state.state.lock().unwrap();
-                state.backup_status = BackupStatus::NotStarted;
-            }
-            if ui.button("Yes").clicked() {
-                println!("si");
-            }
-            
-        });
-    });
+        //Reimposta le variabili in AppState
+        {
+            let mut app_state = state.state.lock().unwrap();
+            app_state.backup_status = BackupStatus::NotStarted;
+            app_state.current_panel = PanelType::Backup;
+        }
+    }
 }
