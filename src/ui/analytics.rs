@@ -46,20 +46,29 @@ pub fn show_analytics_panel(ui: &mut Ui) {
 
         ui.separator();
 
-        // Sezione grafico CPU Usage con Scroll Area
         ui.vertical(|ui| {
             ui.heading("Section 2: Detailed Analytics");
             ui.separator();
             ui.label("CPU Usage over Time:");
         
             if let Some(cpu_data) = read_cpu_usage_data("cpu_usage_log.csv") {
-                // Crea i punti per il grafico: ogni punto è composto da (tempo in minuti, uso CPU)
+
+                // Trova il tempo minimo e massimo per determinare l'intervallo di tempo
+                let min_time = cpu_data.iter().map(|(timestamp, _)| *timestamp).fold(f64::INFINITY, f64::min);
+                let max_time = cpu_data.iter().map(|(timestamp, _)| *timestamp).fold(f64::NEG_INFINITY, f64::max);
+                let time_range = max_time - min_time; // Calcola l'intervallo di tempo totale
+        
+                // Calcola le coordinate X per ogni punto del grafico
+                // Crea i punti per il grafico, usando il formato `hh:mm` per l'asse X
                 let plot_points = cpu_data
                     .iter()
                     .filter(|&(_, value)| *value > 0.0) // Filtra solo i valori di CPU maggiori di 0
-                    .map(|(time, value)| {
-                        // La variabile 'time' è già in minuti e 'value' è l'uso della CPU
-                        [*time, *value as f64 ]
+                    .enumerate() // Aggiungi l'indice per distribuire meglio i punti
+                    .map(|(i, (timestamp, value))| {
+                        // Scala il valore di X per distanziare meglio i punti
+                        let normalized_x = (*timestamp - min_time) / time_range; // Normalizza X nell'intervallo [0, 1]
+                        let x_value = normalized_x * 100.0; // Scala il valore tra 0 e 100 (ad esempio, puoi aumentare questo valore per maggiore distanziamento)
+                        [x_value, *value as f64]
                     })
                     .collect::<Vec<_>>();
         
@@ -84,6 +93,7 @@ pub fn show_analytics_panel(ui: &mut Ui) {
                 ui.label("No CPU usage data available.");
             }
         });
+        
         
         ui.separator();
 
@@ -130,6 +140,19 @@ fn read_cpu_usage_data(file_path: &str) -> Option<Vec<(f64, f32)>> {
     }
 }
 
+fn timestamp_to_hm_format(timestamp: &str) -> String {
+    let parts: Vec<&str> = timestamp.split_whitespace().collect();
+    if parts.len() == 2 {
+        let time = parts[1].split(':').collect::<Vec<&str>>();
+        if time.len() == 3 {
+            let hours = time[0].parse::<u64>().unwrap_or(0);
+            let minutes = time[1].parse::<u64>().unwrap_or(0);
+            let formatted_time = format!("{:02}:{:02}", hours, minutes); // Formatta in hh:mm
+            return formatted_time;
+        }
+    }
+    String::from("00:00") // Valore di fallback in caso di errore
+}
 
 fn timestamp_to_minutes(timestamp: &str) -> f64 {
     let parts: Vec<&str> = timestamp.split_whitespace().collect();
