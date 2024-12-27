@@ -64,7 +64,7 @@ pub fn show_analytics_panel(ui: &mut Ui) {
                     .iter()
                     .filter(|&(_, value)| *value > 0.0) // Filtra solo i valori di CPU maggiori di 0
                     .enumerate() // Aggiungi l'indice per distribuire meglio i punti
-                    .map(|(i, (timestamp, value))| {
+                    .map(|(_i, (timestamp, value))| {
                         // Scala il valore di X per distanziare meglio i punti
                         let normalized_x = (*timestamp - min_time) / time_range; // Normalizza X nell'intervallo [0, 1]
                         let x_value = normalized_x * 100.0; // Scala il valore tra 0 e 100 (ad esempio, puoi aumentare questo valore per maggiore distanziamento)
@@ -138,20 +138,6 @@ fn read_cpu_usage_data(file_path: &str) -> Option<Vec<(f64, f32)>> {
     } else {
         None
     }
-}
-
-fn timestamp_to_hm_format(timestamp: &str) -> String {
-    let parts: Vec<&str> = timestamp.split_whitespace().collect();
-    if parts.len() == 2 {
-        let time = parts[1].split(':').collect::<Vec<&str>>();
-        if time.len() == 3 {
-            let hours = time[0].parse::<u64>().unwrap_or(0);
-            let minutes = time[1].parse::<u64>().unwrap_or(0);
-            let formatted_time = format!("{:02}:{:02}", hours, minutes); // Formatta in hh:mm
-            return formatted_time;
-        }
-    }
-    String::from("00:00") // Valore di fallback in caso di errore
 }
 
 fn timestamp_to_minutes(timestamp: &str) -> f64 {
