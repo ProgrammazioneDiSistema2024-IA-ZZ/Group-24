@@ -10,9 +10,9 @@ use std::fs::File;
 use std::io::BufReader;
 #[cfg(windows)]
 use winapi::um::winuser::{GetSystemMetrics, SM_CXSCREEN, SM_CYSCREEN};
-#[cfg(linux)]
+#[cfg(not(windows))]
 extern crate x11;
-#[cfg(linux)]
+#[cfg(not(windows))]
 use x11::xlib;
 
 use std::ptr;
@@ -33,7 +33,7 @@ pub fn get_screen_resolution() -> Option<(u32, u32)> {
             }
         }
     }
-    #[cfg(linux)]
+    #[cfg(not(windows))]
     {
         unsafe {
             // Usa le X11 API per ottenere la risoluzione dello schermo su Linux

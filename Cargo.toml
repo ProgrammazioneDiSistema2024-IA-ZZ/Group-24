@@ -20,3 +20,11 @@ chrono = "0.4"
 systemstat = "0.1"
 sha2 = "0.10"
 x11 = "2.18.0"
+signal-hook = "0.3"
+
+[[bin]]
+name = "backup_app_group24"
+path = "src/main.rs"
+
+# Disabilita la console su Windows
+windows_subsystem = "windows"

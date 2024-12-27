@@ -11,7 +11,7 @@ use std::{
     sync::{Arc, Mutex}, thread, time::Duration,
 };
 
-use crate::utils::Configuration;
+use crate::{remove_lock_file, utils::Configuration};
 
 /// Enum to define the types of panels in the UI
 #[derive(Default, Serialize, PartialEq, Debug)]
@@ -200,6 +200,7 @@ fn render_sidebar(ctx: &egui::Context, state: &mut AppState) {
             // Render the "Terminate" button at the bottom, visually separated from the menu
             if ui.button("Terminate").clicked() {
                 println!("End of the program");
+                remove_lock_file();
                 process::exit(0); // Terminate the application: halts execution and bypasses Rust's usual stack unwinding mechanism.
             }
         });
@@ -367,6 +368,7 @@ pub fn exit_panel(ctx: &egui::Context, state: &MyApp, error_message: &str) {
             ui.label(error_message); // Display the error message
             if ui.button("Close").clicked() {
                 // Exit the program after closing the error window
+                remove_lock_file();
                 process::exit(1); // Non-zero exit code indicates error
             }
         });

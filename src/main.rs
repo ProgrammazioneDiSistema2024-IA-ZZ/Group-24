@@ -1,3 +1,7 @@
+// Questo evita che il terminale si apra su Windows e non influisce su altri sistemi operativi.
+// ------- ATTIVA QUANDO BUILD COMPLETA -------
+//#![cfg_attr(target_os = "windows", windows_subsystem = "windows")]
+
 mod confirm_sign;
 mod detector;
 mod first_sign;
@@ -8,6 +12,8 @@ mod analytics;
 
 use crate::ui::{AppState, MyApp};
 use eframe::{egui, App, NativeOptions};
+use std::path::Path;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc;
 use std::sync::{Arc, Mutex};
 use ui::BackupStatus;
@@ -15,32 +21,82 @@ use utils::load_image_as_icon;
 use utils::manage_configuration_file;
 use utils::Configuration;
 use analytics::log_cpu_usage_to_csv;
-use std::thread;
-//use single_instance::SingleInstance;
+use std::{fs, process, thread};
+
+//single-application
+use signal_hook::consts::signal;
+#[cfg(not(windows))]
+use signal_hook::iterator::Signals; //da verificare
+#[cfg(windows)]
+use signal_hook::flag;
+
+static LOCK_FILE_PATH: &str = ".app.lock";   // Il file di lock che indica se un'istanza è in esecuzione
+
+// Funzione che rimuove il file di lock
+fn remove_lock_file() {
+    if let Err(e) = fs::remove_file(LOCK_FILE_PATH) {
+        eprintln!("Failed to remove lock file: {}", e);
+    }
+}
 
 fn main() -> Result<(), eframe::Error> {
+
+    // Imposta il panic hook per rimuovere il file di lock in caso di panico
+    std::panic::set_hook(Box::new(|panic_info| {
+        eprintln!("Panic occurred: {:?}", panic_info);
+        remove_lock_file(); // Rimuove il file di lock in caso di panico
+    }));
+
+    /* --- SINGOLA APPLICAZIONE --- */
+    // Controlla se il file di lock esiste
+    if Path::new(LOCK_FILE_PATH).exists() {
+        println!("Another instance of this program is already running.");
+        process::exit(1);  // Esce se esiste già un'istanza in esecuzione
+    }
+    // Crea il file di lock per segnare che l'app è in esecuzione
+    if let Err(e) = fs::write(LOCK_FILE_PATH, "locked") {
+        eprintln!("Failed to create lock file: {}", e);
+        process::exit(1);  // Esci se non riesci a creare il file di lock
+    }
+    println!("Application is running...");
+
+    // Gestione dei segnali
+    #[cfg(not(windows))]
+    {
+        let mut signals = Signals::new(&[signal::SIGTERM, signal::SIGINT]).expect("Unable to set up signal handler");
+        thread::spawn(move || {
+            for signal in signals.forever() {
+                match signal {
+                    signal::SIGINT | signal::SIGTERM => {
+                        println!("Received termination signal. Cleaning up...");
+                        remove_lock_file();
+                        process::exit(0);
+                    }
+                    _ => {}
+                }
+            }
+        });
+    }
+    #[cfg(windows)]
+    {
+        let term_flag = Arc::new(AtomicBool::new(false));
+        flag::register(signal::SIGINT, Arc::clone(&term_flag)).expect("Unable to set up signal handler");
+        flag::register(signal::SIGTERM, Arc::clone(&term_flag)).expect("Unable to set up signal handler");
+
+        thread::spawn(move || {
+            while !term_flag.load(Ordering::Relaxed) {
+                std::thread::sleep(std::time::Duration::from_millis(100));
+            }
+            println!("Received termination signal. Cleaning up...");
+            remove_lock_file();
+            process::exit(0);
+        });
+    }
 
     // Avvia il logging della CPU in un thread separato
     thread::spawn(move || {
         log_cpu_usage_to_csv();  // Avvia la funzione di logging della CPU
     });
-
-
-
-    /* SINGOLA APPLICAZIONE - NON FUNZIONA*/
-    /* let instance = SingleInstance::new("unique_program_identifier");
-    match instance {
-        Ok(instance) => {
-            if !instance.is_single() {
-                println!("Another instance of this program is already running.");
-                return Ok(());
-            }
-        }
-        Err(e) => {
-            eprintln!("Failed to create single instance: {}", e);
-            std::process::exit(1); // Esce con un codice di errore
-        }
-    } */
 
     let (tx, rx) = mpsc::channel::<String>(); // Canale per comunicazione
     let (tx1, rx1) = mpsc::channel::<String>(); // Canale per comunicazion
