@@ -142,9 +142,9 @@ fn main() -> Result<(), eframe::Error> {
     // Avvia il detector in un thread separato
     std::thread::spawn(move || {
         println!("Starting detector...");
-        detector::run(detector_state, detector_tx,rx1);
+        detector::run(detector_state, detector_tx, rx1, Arc::new(AtomicBool::new(true)));
     });
-
+    
     let run_gui;
     //per rilasciare il lock
     {
