@@ -35,9 +35,9 @@ pub fn avvia_backup(
         }
 
         // Invia il messaggio per aggiornare la GUI
-        if tx.send("updateGUI".to_string()).is_err() {
-            eprintln!("Failed to send updateGUI message.");
-        }
+        // if tx.send("updateGUI".to_string()).is_err() {
+        //     eprintln!("Failed to send updateGUI message.");
+        // }
 
         // Esegui il backup
         match perform_backup() {
@@ -58,8 +58,18 @@ pub fn avvia_backup(
         println!("Detector riattivato.");
 
         // Notifica la GUI del completamento del backup
-        if tx.send("updateGUI".to_string()).is_err() {
-            eprintln!("Failed to send updateGUI message.");
+        {
+            let mut state = shared_state.lock().unwrap();
+            if !state.display {
+                if let Err(err) = tx.send("showGUI".to_string()) {
+                    eprintln!("Failed to send showGUI message: {}", err);
+                    state.display = false; // Assicurati che lo stato rifletta correttamente il fallimento
+                } else {
+                    println!("Message sent to show GUI.");
+                }
+            } else {
+                println!("GUI already active. Skipping message.");
+            }
         }
     });
 
