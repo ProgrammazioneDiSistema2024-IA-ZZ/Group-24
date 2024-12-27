@@ -9,6 +9,8 @@ use std::time::Duration;
 use crate::utils;
 use crate::first_sign;
 use crate::confirm_sign;
+use std::sync::atomic::{AtomicBool, Ordering};
+
 
 #[derive(Debug)]
 struct ScreenResolution {
@@ -16,27 +18,60 @@ struct ScreenResolution {
     height: f64,
 }
 
-pub fn avvia_backup(shared_state: Arc<Mutex<AppState>>) {  
+pub fn avvia_backup(
+    shared_state: Arc<Mutex<AppState>>,
+    detector_running: Arc<AtomicBool>,
+    tx: Sender<String>,
+) {
+    // Disattiva il detector
+    detector_running.store(false, Ordering::Relaxed);
+    println!("Detector disattivato.");
 
-    // attesa fittizia
-    /* let total_steps = 10;
-    for i in 1..=total_steps {
-        thread::sleep(Duration::from_millis(800)); // Pausa di 1 secondo per step
-        if i % 3 == 0 {
-            println!("Backup in corso... {}%", ((i as f64) / (total_steps as f64)) * 100.0);
+    // Avvia un nuovo thread per il backup
+    std::thread::spawn(move || {
+        {
+            let mut state = shared_state.lock().unwrap();
+            state.backup_status = BackupStatus::InProgress;
         }
-    } */
 
-    match perform_backup() {
-        Ok(_) => {
-            shared_state.lock().unwrap().backup_status = BackupStatus::CompletedSuccess;
+        // Invia il messaggio per aggiornare la GUI
+        if tx.send("updateGUI".to_string()).is_err() {
+            eprintln!("Failed to send updateGUI message.");
         }
-        Err(err) => {
-            shared_state.lock().unwrap().backup_status = BackupStatus::CompletedError(err);
+
+        // Esegui il backup
+        match perform_backup() {
+            Ok(_) => {
+                let mut state = shared_state.lock().unwrap();
+                state.backup_status = BackupStatus::CompletedSuccess;
+                println!("Backup completato con successo.");
+            }
+            Err(err) => {
+                let mut state = shared_state.lock().unwrap();
+                state.backup_status = BackupStatus::CompletedError(err);
+                println!("Backup fallito");
+            }
         }
-    }
+
+        // Riattiva il detector al completamento del backup
+        detector_running.store(true, Ordering::Relaxed);
+        println!("Detector riattivato.");
+
+        // Notifica la GUI del completamento del backup
+        if tx.send("updateGUI".to_string()).is_err() {
+            eprintln!("Failed to send updateGUI message.");
+        }
+    });
+
+    println!("Il backup è stato avviato in un thread separato.");
 }
-pub fn run(shared_state: Arc<Mutex<AppState>>, tx: Sender<String>, rx: Receiver<String>) {
+
+pub fn run(
+    shared_state: Arc<Mutex<AppState>>,
+    tx: Sender<String>,
+    rx: Receiver<String>,
+    detector_running: Arc<AtomicBool>,
+) {
     let tolerance = 30.0; // Tolleranza
 
     let (screen_width, screen_height): (f64, f64) = match utils::get_screen_resolution() {
@@ -62,7 +97,6 @@ pub fn run(shared_state: Arc<Mutex<AppState>>, tx: Sender<String>, rx: Receiver<
     let waiting_for_confirmation = Arc::new(Mutex::new(false));
     let horizontal_line_tracker = Arc::new(Mutex::new(confirm_sign::HorizontalLineTracker::new()));
 
-    // Clone `waiting_for_confirmation` per usarlo nel thread
     let waiting_for_confirmation_clone = Arc::clone(&waiting_for_confirmation);
 
     // Thread separato per ascoltare i messaggi su `rx`
@@ -76,10 +110,14 @@ pub fn run(shared_state: Arc<Mutex<AppState>>, tx: Sender<String>, rx: Receiver<
         }
     });
 
-    // Parametro per definire quanti segmenti per lato verificare
-    let segment_count = 20; // ad esempio 20 segmenti per lato
+    let segment_count = 20; // Numero di segmenti per lato
 
     if let Err(error) = listen(move |event| {
+        // Controlla se il detector è attivo
+        if !detector_running.load(Ordering::Relaxed) {
+            return;
+        }
+
         match event.event_type {
             EventType::ButtonPress(Button::Left) => {
                 let mut tracking = tracking_active.lock().unwrap();
@@ -91,7 +129,6 @@ pub fn run(shared_state: Arc<Mutex<AppState>>, tx: Sender<String>, rx: Receiver<
                     edges.reset();
                     println!("Tracciamento del contorno iniziato (rettangolare)...");
                 } else {
-                    // Reset del tracciamento della linea orizzontale
                     let mut line_tracker = horizontal_line_tracker.lock().unwrap();
                     line_tracker.reset();
                     println!("Inizio tracciamento della linea orizzontale di conferma.");
@@ -102,7 +139,6 @@ pub fn run(shared_state: Arc<Mutex<AppState>>, tx: Sender<String>, rx: Receiver<
                 let mut waiting = waiting_for_confirmation.lock().unwrap();
                 *tracking = false;
 
-                // Ottieni larghezza/altezza
                 let resolution = screen_resolution.lock().unwrap();
                 let screen_width = resolution.width;
                 let screen_height = resolution.height;
@@ -110,22 +146,19 @@ pub fn run(shared_state: Arc<Mutex<AppState>>, tx: Sender<String>, rx: Receiver<
                 if !*waiting {
                     let edges = edges_tracker.lock().unwrap();
 
-                    // Qui usiamo la nuova funzione anziché all_edges_touched()
                     if edges.is_contour_complete(screen_width, screen_height, segment_count) {
                         utils::play_sound("Sounds/system-notification-199277.mp3");
                         {
                             let mut state = shared_state.lock().unwrap();
-                            state.backup_status = BackupStatus::ToConfirm; // Passa allo stato di conferma
+                            state.backup_status = BackupStatus::ToConfirm;
                         }
                         println!("Contorno completo riconosciuto! Disegna una linea orizzontale per confermare e avviare il backup.");
 
                         {
                             let mut state = shared_state.lock().unwrap();
                             if !state.display {
-                                // Se la GUI non è aperta, aggiorna lo stato e invia il messaggio
                                 if let Err(err) = tx.send("showGUI".to_string()) {
                                     eprintln!("Failed to send message: {}", err);
-                                    // Ripristina lo stato in caso di errore nell'invio del messaggio
                                     state.display = false;
                                 } else {
                                     println!("Message sent successfully.");
@@ -140,21 +173,15 @@ pub fn run(shared_state: Arc<Mutex<AppState>>, tx: Sender<String>, rx: Receiver<
                         println!("Contorno non completo. Riprova disegnando il perimetro completo dello schermo.");
                     }
                 } else {
-                    // Controlla se è stata disegnata una linea orizzontale
                     let line_tracker = horizontal_line_tracker.lock().unwrap();
                     if line_tracker.is_valid_horizontal() {
                         println!("Linea orizzontale riconosciuta! Avvio del backup...");
-                        /* --- GESTIONE COMUNICAZIONE CON THREAD PRINCIPALE ---- */
-                        // fai apparire la GUI, per mostrare la schermata di backup in corso, o mostrare eventuali errori
-                        // Prova fino a 3 volte, in caso di condizione temporanea (improbabile nel caso di mpsc)
-
+                    
                         {
                             let mut state = shared_state.lock().unwrap();
                             if !state.display {
-                                // Se la GUI non è aperta, aggiorna lo stato e invia il messaggio
                                 if let Err(err) = tx.send("showGUI".to_string()) {
                                     eprintln!("Failed to send message: {}", err);
-                                    // Ripristina lo stato in caso di errore nell'invio del messaggio
                                     state.display = false;
                                 } else {
                                     println!("Message sent successfully.");
@@ -163,13 +190,15 @@ pub fn run(shared_state: Arc<Mutex<AppState>>, tx: Sender<String>, rx: Receiver<
                                 println!("GUI already active. Skipping message.");
                             }
                         }
-
-                        //per rilasciare il lock
-                        {
-                            shared_state.lock().unwrap().backup_status = BackupStatus::InProgress;
-                        }
                     
-                        avvia_backup(Arc::clone(&shared_state));
+                        // Disattiva il detector e avvia il backup
+                        detector_running.store(false, Ordering::Relaxed);
+                        avvia_backup(
+                            Arc::clone(&shared_state),
+                            Arc::clone(&detector_running),
+                            tx.clone(), // Aggiungi il trasmettitore
+                        );
+                    
                         *waiting = false;
                     } else {
                         println!("Movimento non riconosciuto come linea orizzontale di conferma.");
@@ -187,7 +216,6 @@ pub fn run(shared_state: Arc<Mutex<AppState>>, tx: Sender<String>, rx: Receiver<
                     let mut edges = edges_tracker.lock().unwrap();
                     edges.update_edges_rectangle(x, y, screen_width, screen_height, tolerance);
                 } else if *waiting {
-                    // Aggiornamento per la linea di conferma
                     let mut line_tracker = horizontal_line_tracker.lock().unwrap();
                     line_tracker.update(x, y);
                 }
