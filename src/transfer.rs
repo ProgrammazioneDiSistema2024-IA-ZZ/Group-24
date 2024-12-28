@@ -7,6 +7,7 @@ use std::fs;
 use std::fs::File;
 use std::io::{self, Read};
 use std::path::Path;
+use std::sync::mpsc::Receiver;
 use std::time::Instant;
 use systemstat::{Platform, System};
 
@@ -118,7 +119,104 @@ fn backup_folder(
 
     Ok(())
 }
+pub fn perform_backup_with_stop(stop_rx: &Receiver<String>) -> Result<(), String> {
+    // Recupera i dati dalla configurazione statica
+    let config = manage_configuration_file();
 
+    // Verifica se config è di tipo Configuration::Build
+    if let Configuration::Build(source_folder, destination_folder, backup_type, file_types) = config {
+        let source_path = Path::new(&source_folder);
+        let dest_path = Path::new(&destination_folder);
+
+        // Verifica che le cartelle esistano
+        if !source_path.is_dir() {
+            return Err(format!("Source folder: `{}` does not exist.", source_folder));
+        }
+        if !dest_path.is_dir() {
+            return Err(format!("Destination folder: `{}` does not exist.", destination_folder));
+        }
+
+        // Determina i tipi di file da includere
+        let include_all = backup_type == "total" || (backup_type == "custom" && file_types.is_empty());
+        let file_types: Vec<&str> = file_types.iter().map(|s| s.as_str()).collect();
+
+        // Calcola la durata del backup
+        let start_time = Instant::now();
+
+        // Riproduci suono di inizio backup
+        play_sound("Sounds/bubblepop-254773.mp3");
+
+        // Esegui il backup
+        if let Err(e) = backup_folder_with_stop(source_path, dest_path, include_all, &file_types, stop_rx) {
+            play_sound("Sounds/incorrect-buzzer-sound-147336.mp3");
+            return Err(format!("Backup failed: {}", e));
+        } else {
+            play_sound("Sounds/bellding-254774.mp3");
+            let duration = start_time.elapsed().as_secs(); // Durata del backup in secondi
+            let total_size = get_total_size(source_path).map_err(|e| e.to_string())?; // Calcola i dati trasferiti in byte
+                                                                                      // Registra i dettagli del backup nelle analitiche
+            let cpu_usage = get_cpu_usage();
+            log_backup_data_to_csv(total_size, duration, cpu_usage);
+        }
+
+        Ok(())
+    } else {
+        Err("Configurazione non valida. Imposta una configurazione valida dal pannello di Backup!".to_string())
+    }
+}
+
+fn backup_folder_with_stop(
+    source: &Path,
+    destination: &Path,
+    include_all: bool,
+    file_types: &[&str],
+    stop_rx: &Receiver<String>,
+) -> io::Result<()> {
+    // Crea la directory di destinazione se non esiste
+    if !destination.exists() {
+        fs::create_dir_all(destination)?;
+    }
+
+    // Itera sui file e sottocartelle nella sorgente
+    for entry in fs::read_dir(source)? {
+        // Controlla se è stato ricevuto il comando di stop
+        if let Ok(msg) = stop_rx.try_recv() {
+            if msg == "stop" {
+                play_sound("Sounds/incorrect-buzzer-sound-147336.mp3");
+                return Err(io::Error::new(io::ErrorKind::Interrupted, "Backup interrotto dall'utente."));
+            }
+        }
+
+        let entry = entry?;
+        let path = entry.path();
+        let dest_path = destination.join(entry.file_name());
+
+        println!("Processing: {:?}", path);
+        if path.is_dir() {
+            println!("Entering directory: {:?}", path);
+            // Esegui il backup ricorsivamente per le sottocartelle
+            backup_folder_with_stop(&path, &dest_path, include_all, file_types, stop_rx)?;
+        } else if path.is_file() {
+            // Copia il file se rientra nei criteri
+            if include_all || matches_file_type(&path, file_types) {
+                println!("Copying file: {:?} -> {:?}", path, dest_path);
+                fs::copy(&path, &dest_path)?;
+
+                // Controlla l'integrità del file copiato
+                if !verify_file_integrity(&path, &dest_path)? {
+                    return Err(io::Error::new(
+                        io::ErrorKind::Other,
+                        format!("File corrotto: {:?}", path),
+                    ));
+                }
+            } else {
+                println!("Skipping file: {:?}", path);
+            }
+        }
+    }
+
+    Ok(())
+}
 /// Controlla se un file corrisponde ai tipi specificati
 fn matches_file_type(file: &Path, file_types: &[&str]) -> bool {
     // Estrazione dell'estensione:

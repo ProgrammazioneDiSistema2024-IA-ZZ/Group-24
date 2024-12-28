@@ -4,6 +4,7 @@ use std::sync::mpsc::Receiver;
 use std::sync::{Arc, Mutex};
 use std::thread;
 use crate::transfer::perform_backup;
+use crate::transfer::perform_backup_with_stop;
 use crate::ui::{AppState, BackupStatus};
 use std::time::Duration;
 use crate::utils;
@@ -22,7 +23,8 @@ pub fn avvia_backup(
     shared_state: Arc<Mutex<AppState>>,
     detector_running: Arc<AtomicBool>,
     tx: Sender<String>,
-) {
+    stop_rx: Arc<Mutex<Receiver<String>>>, // Receiver incapsulato
+){
     // Disattiva il detector
     detector_running.store(false, Ordering::Relaxed);
     println!("Detector disattivato.");
@@ -34,13 +36,13 @@ pub fn avvia_backup(
             state.backup_status = BackupStatus::InProgress;
         }
 
-        // Invia il messaggio per aggiornare la GUI
-        // if tx.send("updateGUI".to_string()).is_err() {
-        //     eprintln!("Failed to send updateGUI message.");
-        // }
-
-        // Esegui il backup
-        match perform_backup() {
+        // Esegui il backup con controllo di stop
+        // Sblocca il Mutex per ottenere il Receiver e passa la referenza
+        let backup_result = {
+            let stop_rx = stop_rx.lock().unwrap(); // Sblocca il Mutex
+            perform_backup_with_stop(&*stop_rx)    // Passa una referenza al Receiver
+        };
+        match backup_result {
             Ok(_) => {
                 let mut state = shared_state.lock().unwrap();
                 state.backup_status = BackupStatus::CompletedSuccess;
@@ -48,8 +50,13 @@ pub fn avvia_backup(
             }
             Err(err) => {
                 let mut state = shared_state.lock().unwrap();
-                state.backup_status = BackupStatus::CompletedError(err);
-                println!("Backup fallito");
+                if err == "stop" {
+                    state.backup_status = BackupStatus::NotStarted;
+                    println!("Backup interrotto dall'utente.");
+                } else {
+                    state.backup_status = BackupStatus::CompletedError(err);
+                    println!("Backup fallito");
+                }
             }
         }
 
@@ -79,11 +86,11 @@ pub fn avvia_backup(
 pub fn run(
     shared_state: Arc<Mutex<AppState>>,
     tx: Sender<String>,
-    rx: Receiver<String>,
+    rx: Receiver<String>, // Canale per i messaggi generici
+    rx_stop: Arc<Mutex<Receiver<String>>>,
     detector_running: Arc<AtomicBool>,
 ) {
     let tolerance = 30.0; // Tolleranza
-
     let (screen_width, screen_height): (f64, f64) = match utils::get_screen_resolution() {
         Some((w, h)) => {
             let w_f64 = w as f64;
@@ -203,10 +210,13 @@ pub fn run(
                     
                         // Disattiva il detector e avvia il backup
                         detector_running.store(false, Ordering::Relaxed);
+                        
+
                         avvia_backup(
                             Arc::clone(&shared_state),
                             Arc::clone(&detector_running),
                             tx.clone(), // Aggiungi il trasmettitore
+                            Arc::clone(&rx_stop), // Passa il canale di stop al backup
                         );
                     
                         *waiting = false;

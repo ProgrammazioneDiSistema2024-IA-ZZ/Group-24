@@ -39,6 +39,7 @@ pub enum BackupStatus {
     ToConfirm,
     InProgress,
     CompletedSuccess,
+    Canceled,
     CompletedError(String),
 }
 
@@ -65,15 +66,15 @@ pub struct AppState {
 
 pub struct MyApp {
     pub state: Arc<Mutex<AppState>>,
-    pub tx1: Sender<String>, // Aggiungi tx1 per inviare messaggi al decoder
+    pub tx1: Sender<String>,       // Canale per comunicare col Detector
+    pub tx_stop: Sender<String>,   // Canale per inviare lo stop al Backup
 }
 
 impl MyApp {
-    pub fn new(state: Arc<Mutex<AppState>>, tx1: Sender<String>) -> Self {
-        MyApp { state, tx1 }
+    pub fn new(state: Arc<Mutex<AppState>>, tx1: Sender<String>, tx_stop: Sender<String>) -> Self {
+        MyApp { state, tx1, tx_stop }
     }
 }
-
 impl AppState {
     /// Crea un nuovo stato applicativo basandosi su una configurazione o sui valori di default.
     pub fn new_from_config(config: Configuration) -> Self {
@@ -402,6 +403,11 @@ pub fn show_backup_window(ctx: &egui::Context, state: &mut MyApp) {
             ("Backup Completed", "Backup completed successfully!", true)
         }
         BackupStatus::CompletedError(ref err) => ("Backup Failed", err.as_str(), true),
+        BackupStatus::Canceled => (
+            "Backup Cancellation",
+            "The backup operation is being canceled. Please wait...",
+            false,
+        ),
         BackupStatus::NotStarted => return,
         
     };
@@ -451,14 +457,18 @@ fn render_backup_progress(ui: &mut Ui, state: &mut MyApp) {
     ui.label("Click \"Stop\" to abort the backup");
 
     if ui.button("Stop").clicked() {
-        //Segnala al thread "backup" di terminare la procedura
-        //todo
+        // Invia il comando di stop al thread "backup"
+        if let Err(err) = state.tx_stop.send("stop".to_string()) {
+            eprintln!("Failed to send stop message to backup thread: {}", err);
+        } else {
+            println!("Stop message sent to backup thread.");
+        }
 
-        //Reimposta le variabili in AppState
+        // Reimposta le variabili in AppState
+        // Reimposta lo stato del backup a "Canceled"
         {
             let mut app_state = state.state.lock().unwrap();
-            app_state.backup_status = BackupStatus::NotStarted;
-            app_state.current_panel = PanelType::Backup;
+            app_state.backup_status = BackupStatus::Canceled;
         }
     }
 }

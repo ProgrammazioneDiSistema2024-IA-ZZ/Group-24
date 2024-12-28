@@ -21,7 +21,7 @@ use utils::load_image_as_icon;
 use utils::manage_configuration_file;
 use utils::Configuration;
 use analytics::log_cpu_usage_to_csv;
-use std::{fs, process, thread};
+use std::{clone, fs, process, thread};
 
 //single-application
 use signal_hook::consts::signal;
@@ -100,6 +100,8 @@ fn main() -> Result<(), eframe::Error> {
 
     let (tx, rx) = mpsc::channel::<String>(); // Canale per comunicazione
     let (tx1, rx1) = mpsc::channel::<String>(); // Canale per comunicazion
+    let (tx_stop, rx_stop) = mpsc::channel::<String>(); // Canale per lo stop
+    let rx_stop = Arc::new(Mutex::new(rx_stop)); // Incapsula il Receiver
     // Ottieni la configurazione
     let config = manage_configuration_file();
 
@@ -139,12 +141,21 @@ fn main() -> Result<(), eframe::Error> {
     // Cloniamo il trasmettitore per il detector
     let detector_tx = tx.clone(); 
     
-    // Avvia il detector in un thread separato
-    std::thread::spawn(move || {
-        println!("Starting detector...");
-        detector::run(detector_state, detector_tx, rx1, Arc::new(AtomicBool::new(true)));
-    });
+
+
     
+    
+    std::thread::spawn(move || {
+        let rx_stop_clone = Arc::clone(&rx_stop);
+        println!("Starting detector...");
+        detector::run(
+            detector_state,
+            detector_tx,
+            rx1,                     // Passa rx1 per la comunicazione normale
+            rx_stop_clone,    // Passa rx_stop incapsulato per il controllo dello stop
+            Arc::new(AtomicBool::new(true)),
+        );
+    });
     let run_gui;
     //per rilasciare il lock
     {
@@ -154,8 +165,9 @@ fn main() -> Result<(), eframe::Error> {
     if run_gui {
         println!("GUI started for the first time.");
         let gui_tx = tx1.clone(); 
+        let stop_tx=tx_stop.clone();
         let options_for_gui = options.clone();
-        let my_app = MyApp::new(Arc::clone(&shared_state),gui_tx);
+        let my_app = MyApp::new(Arc::clone(&shared_state),gui_tx,stop_tx);
         eframe::run_native(
             "Group 24 - Backup Application",
             options_for_gui,
@@ -194,8 +206,9 @@ fn main() -> Result<(), eframe::Error> {
             //shared_state.lock().unwrap().pretty_print();
         }
         let gui_tx = tx1.clone(); 
-        let options_for_gui = options.clone();  // Clone options here
-        let my_app = MyApp::new(Arc::clone(&shared_state),gui_tx);
+        let stop_tx=tx_stop.clone();
+        let options_for_gui = options.clone();
+        let my_app = MyApp::new(Arc::clone(&shared_state),gui_tx,stop_tx);
         eframe::run_native(
             "Group 24 - Backup Application",
             options_for_gui,
