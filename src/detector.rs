@@ -1,17 +1,15 @@
-use rdev::{listen, EventType, Button};
-use std::sync::mpsc::Sender;
-use std::sync::mpsc::Receiver;
-use std::sync::{Arc, Mutex};
-use std::thread;
-use crate::transfer::perform_backup;
-use crate::transfer::perform_backup_with_stop;
-use crate::ui::{AppState, BackupStatus};
-use std::time::Duration;
-use crate::utils;
-use crate::first_sign;
 use crate::confirm_sign;
+use crate::first_sign;
+// use crate::transfer::perform_backup;
+use crate::transfer::perform_backup_with_stop;
+use crate::ui::BackupStatus;
+use crate::ui::MyApp;
+use crate::utils;
+use rdev::{listen, Button, EventType};
 use std::sync::atomic::{AtomicBool, Ordering};
-
+use std::sync::mpsc::Receiver;
+use std::sync::mpsc::Sender;
+use std::sync::{Arc, Mutex};
 
 #[derive(Debug)]
 struct ScreenResolution {
@@ -20,11 +18,11 @@ struct ScreenResolution {
 }
 
 pub fn avvia_backup(
-    shared_state: Arc<Mutex<AppState>>,
+    shared_state: Arc<Mutex<MyApp>>,
     detector_running: Arc<AtomicBool>,
     tx: Sender<String>,
     stop_rx: Arc<Mutex<Receiver<String>>>, // Receiver incapsulato
-){
+) {
     // Disattiva il detector
     detector_running.store(false, Ordering::Relaxed);
     println!("Detector disattivato.");
@@ -32,7 +30,8 @@ pub fn avvia_backup(
     // Avvia un nuovo thread per il backup
     std::thread::spawn(move || {
         {
-            let mut state = shared_state.lock().unwrap();
+            let state = shared_state.lock().unwrap();
+            let mut state = state.state.lock().unwrap();
             state.backup_status = BackupStatus::InProgress;
         }
 
@@ -40,16 +39,19 @@ pub fn avvia_backup(
         // Sblocca il Mutex per ottenere il Receiver e passa la referenza
         let backup_result = {
             let stop_rx = stop_rx.lock().unwrap(); // Sblocca il Mutex
-            perform_backup_with_stop(&*stop_rx)    // Passa una referenza al Receiver
+            let mut state = shared_state.lock().unwrap();
+            perform_backup_with_stop(&*stop_rx, &mut state) // Passa una referenza al Receiver
         };
         match backup_result {
             Ok(_) => {
-                let mut state = shared_state.lock().unwrap();
+                let state = shared_state.lock().unwrap();
+                let mut state = state.state.lock().unwrap();
                 state.backup_status = BackupStatus::CompletedSuccess;
                 println!("Backup completato con successo.");
             }
             Err(err) => {
-                let mut state = shared_state.lock().unwrap();
+                let state = shared_state.lock().unwrap();
+                let mut state = state.state.lock().unwrap();
                 if err == "stop" {
                     state.backup_status = BackupStatus::NotStarted;
                     println!("Backup interrotto dall'utente.");
@@ -66,7 +68,8 @@ pub fn avvia_backup(
 
         // Notifica la GUI del completamento del backup
         {
-            let mut state = shared_state.lock().unwrap();
+            let state = shared_state.lock().unwrap();
+            let mut state = state.state.lock().unwrap();
             if !state.display {
                 if let Err(err) = tx.send("showGUI".to_string()) {
                     eprintln!("Failed to send showGUI message: {}", err);
@@ -84,7 +87,7 @@ pub fn avvia_backup(
 }
 
 pub fn run(
-    shared_state: Arc<Mutex<AppState>>,
+    shared_state: Arc<Mutex<MyApp>>,
     tx: Sender<String>,
     rx: Receiver<String>, // Canale per i messaggi generici
     rx_stop: Arc<Mutex<Receiver<String>>>,
@@ -120,7 +123,9 @@ pub fn run(
     std::thread::spawn(move || {
         while let Ok(msg) = rx.recv() {
             if msg == "resetWaiting" {
-                println!("Ricevuto messaggio: resetWaiting. Imposto waiting_for_confirmation a false.");
+                println!(
+                    "Ricevuto messaggio: resetWaiting. Imposto waiting_for_confirmation a false."
+                );
                 let mut waiting = waiting_for_confirmation_clone.lock().unwrap();
                 *waiting = false;
             }
@@ -166,13 +171,15 @@ pub fn run(
                     if edges.is_contour_complete(screen_width, screen_height, segment_count) {
                         utils::play_sound("Sounds/system-notification-199277.mp3");
                         {
-                            let mut state = shared_state.lock().unwrap();
+                            let state = shared_state.lock().unwrap();
+                            let mut state = state.state.lock().unwrap();
                             state.backup_status = BackupStatus::ToConfirm;
                         }
                         println!("Contorno completo riconosciuto! Disegna una linea orizzontale per confermare e avviare il backup.");
 
                         {
-                            let mut state = shared_state.lock().unwrap();
+                            let state = shared_state.lock().unwrap();
+                            let mut state = state.state.lock().unwrap();
                             if !state.display {
                                 if let Err(err) = tx.send("showGUI".to_string()) {
                                     eprintln!("Failed to send message: {}", err);
@@ -193,9 +200,10 @@ pub fn run(
                     let line_tracker = horizontal_line_tracker.lock().unwrap();
                     if line_tracker.is_valid_horizontal() {
                         println!("Linea orizzontale riconosciuta! Avvio del backup...");
-                    
+
                         {
-                            let mut state = shared_state.lock().unwrap();
+                            let state = shared_state.lock().unwrap();
+                            let mut state = state.state.lock().unwrap();
                             if !state.display {
                                 if let Err(err) = tx.send("showGUI".to_string()) {
                                     eprintln!("Failed to send message: {}", err);
@@ -207,18 +215,17 @@ pub fn run(
                                 println!("GUI already active. Skipping message.");
                             }
                         }
-                    
+
                         // Disattiva il detector e avvia il backup
                         detector_running.store(false, Ordering::Relaxed);
-                        
 
                         avvia_backup(
                             Arc::clone(&shared_state),
                             Arc::clone(&detector_running),
-                            tx.clone(), // Aggiungi il trasmettitore
+                            tx.clone(),           // Aggiungi il trasmettitore
                             Arc::clone(&rx_stop), // Passa il canale di stop al backup
                         );
-                    
+
                         *waiting = false;
                     } else {
                         println!("Movimento non riconosciuto come linea orizzontale di conferma.");

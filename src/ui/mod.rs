@@ -1,14 +1,16 @@
 pub mod analytics;
 pub mod backup;
 pub mod info;
-use std::sync::mpsc::Sender;
 use backup::save_folders;
 use eframe::egui::{self, Color32, Ui};
 use serde::Serialize;
+use std::sync::mpsc::Sender;
 
 use std::{
     process,
-    sync::{Arc, Mutex}, thread, time::Duration,
+    sync::{Arc, Mutex},
+    thread,
+    time::Duration,
 };
 
 use crate::{remove_lock_file, utils::Configuration};
@@ -58,9 +60,9 @@ pub struct AppState {
     pub error_message: Option<String>,     // for error messages
     pub error_source: Option<ErrorSource>, // Origine dell'errore
     pub exit_message: Option<String>,
-    show_error_modal: bool, // Controllo per il modale
-    pub show_confirmation_modal: bool,      // utilizzato quando si vuole chiudere l'applicazione
-    pub display: bool,        // permette di chiudere la GUI, senza terminare l'intero programma. Viene presa dal file di configurazione per una prima installazione
+    show_error_modal: bool,            // Controllo per il modale
+    pub show_confirmation_modal: bool, // utilizzato quando si vuole chiudere l'applicazione
+    pub display: bool, // permette di chiudere la GUI, senza terminare l'intero programma. Viene presa dal file di configurazione per una prima installazione
     pub backup_status: BackupStatus,
 }
 
@@ -68,11 +70,22 @@ pub struct MyApp {
     pub state: Arc<Mutex<AppState>>,
     pub tx1: Sender<String>,       // Canale per comunicare col Detector
     pub tx_stop: Sender<String>,   // Canale per inviare lo stop al Backup
+    pub progress: Arc<Mutex<f32>>, // Progresso del backup (valore tra 0.0 e 1.0)
 }
 
 impl MyApp {
-    pub fn new(state: Arc<Mutex<AppState>>, tx1: Sender<String>, tx_stop: Sender<String>) -> Self {
-        MyApp { state, tx1, tx_stop }
+    pub fn new(
+        state: Arc<Mutex<AppState>>,
+        tx1: Sender<String>,
+        tx_stop: Sender<String>,
+        progress: Arc<Mutex<f32>>,
+    ) -> Self {
+        MyApp {
+            state,
+            tx1,
+            tx_stop,
+            progress,
+        }
     }
 }
 impl AppState {
@@ -100,7 +113,7 @@ impl AppState {
                     show_info_modal: false,
                     show_confirmation_modal: false,
                     display: true,
-                    backup_status: BackupStatus::NotStarted
+                    backup_status: BackupStatus::NotStarted,
                 }
             }
             _ => Self {
@@ -119,7 +132,7 @@ impl AppState {
                 show_error_modal: false,
                 show_confirmation_modal: false,
                 display: true,
-                backup_status: BackupStatus::NotStarted
+                backup_status: BackupStatus::NotStarted,
             },
         }
     }
@@ -139,7 +152,10 @@ impl AppState {
         println!("  error_source: {:?}", self.error_source);
         println!("  exit_message: {:?}", self.exit_message);
         println!("  show_error_modal: {}", self.show_error_modal);
-        println!("  show_confirmation_modal: {}", self.show_confirmation_modal);
+        println!(
+            "  show_confirmation_modal: {}",
+            self.show_confirmation_modal
+        );
         println!("  display: {}", self.display);
         println!("  backup_status: {:?}", self.backup_status);
         println!("}}");
@@ -181,16 +197,28 @@ fn render_sidebar(ctx: &egui::Context, state: &mut AppState) {
 
             // Menu header
             ui.heading("Menu");
-            
+
             // Render menu as a list of links
             ui.vertical(|ui| {
-                if ui.selectable_label(state.current_panel == PanelType::Backup, "Backup Panel").clicked() {
+                if ui
+                    .selectable_label(state.current_panel == PanelType::Backup, "Backup Panel")
+                    .clicked()
+                {
                     state.current_panel = PanelType::Backup;
                 }
-                if ui.selectable_label(state.current_panel == PanelType::Analytics, "Analytics Panel").clicked() {
+                if ui
+                    .selectable_label(
+                        state.current_panel == PanelType::Analytics,
+                        "Analytics Panel",
+                    )
+                    .clicked()
+                {
                     state.current_panel = PanelType::Analytics;
                 }
-                if ui.selectable_label(state.current_panel == PanelType::Info, "Info Panel").clicked() {
+                if ui
+                    .selectable_label(state.current_panel == PanelType::Info, "Info Panel")
+                    .clicked()
+                {
                     state.current_panel = PanelType::Info;
                 }
             });
@@ -208,11 +236,7 @@ fn render_sidebar(ctx: &egui::Context, state: &mut AppState) {
 }
 
 // Render the main content area
-fn render_main_content(
-    ctx: &egui::Context,
-    state: &mut AppState
-) {
-
+fn render_main_content(ctx: &egui::Context, state: &mut AppState) {
     egui::CentralPanel::default().show(ctx, |ui| {
         if state.show_confirmation_modal || state.show_error_modal || state.show_info_modal {
             ui.set_enabled(false);
@@ -227,7 +251,6 @@ fn render_main_content(
 
 // Render the error modal
 fn render_error_modal(ctx: &egui::Context, state: &mut AppState) {
-
     let error_type = match state.error_source {
         Some(ErrorSource::FileTypeValidation) => "File Type Error",
         Some(ErrorSource::SaveOperation) => "Save Error",
@@ -253,7 +276,6 @@ fn render_error_modal(ctx: &egui::Context, state: &mut AppState) {
 }
 
 fn render_success_modal(ctx: &egui::Context, state: &mut AppState) {
-
     // Check if it's an attention message
     if let Some(InfoSource::Attention) = &state.info_source {
         // Create an attention window
@@ -314,8 +336,9 @@ pub fn render_modal_exit(ctx: &egui::Context, state: &mut MyApp, frame: &mut efr
     let show_confirmation_modal;
     //per rilasciare il lock
     {
-        show_confirmation_modal = state.state.lock().unwrap().show_confirmation_modal.clone(); // Accedi al Mutex
-    } 
+        show_confirmation_modal = state.state.lock().unwrap().show_confirmation_modal.clone();
+        // Accedi al Mutex
+    }
 
     if show_confirmation_modal {
         // Mostra il modal di conferma
@@ -329,7 +352,10 @@ pub fn render_modal_exit(ctx: &egui::Context, state: &mut MyApp, frame: &mut efr
                 ui.label("Are you sure you want to quit the user panel?");
                 ui.label("Click 'No' if you wish to continue using it.");
                 ui.label("Click 'Yes' if you want to close the user panel.");
-                ui.colored_label(Color32::LIGHT_RED,"(Tip) If you want to stop the backup service, click 'Terminate'");
+                ui.colored_label(
+                    Color32::LIGHT_RED,
+                    "(Tip) If you want to stop the backup service, click 'Terminate'",
+                );
 
                 // Pulsanti
                 ui.horizontal(|ui| {
@@ -339,13 +365,11 @@ pub fn render_modal_exit(ctx: &egui::Context, state: &mut MyApp, frame: &mut efr
                     }
                     if ui.button("Yes").clicked() {
                         app_state.show_confirmation_modal = false; // Close the modal */
-
                         app_state.display = false; // User chose to hide the GUI
-                        //attendi qualche millisecondo prima di chiudere
+                                                   //attendi qualche millisecondo prima di chiudere
                         thread::sleep(Duration::from_millis(100));
                         frame.close(); // Handle close event
                     }
-                    
                 });
             });
     }
@@ -385,7 +409,6 @@ pub fn show_backup_window(ctx: &egui::Context, state: &mut MyApp) {
         backup_status = app_state.backup_status.clone();
         show_confirmation_modal = app_state.show_confirmation_modal.clone();
     }
-    
 
     // Determina il titolo e il messaggio in base allo stato del backup
     let (title, message, show_return_button) = match backup_status {
@@ -409,14 +432,12 @@ pub fn show_backup_window(ctx: &egui::Context, state: &mut MyApp) {
             false,
         ),
         BackupStatus::NotStarted => return,
-        
     };
 
     // Disegna il pannello centrale
     egui::CentralPanel::default().show(ctx, |ui| {
         ui.vertical_centered(|ui| {
-
-            if show_confirmation_modal  {
+            if show_confirmation_modal {
                 ui.set_enabled(false);
             }
 
@@ -437,7 +458,6 @@ pub fn show_backup_window(ctx: &egui::Context, state: &mut MyApp) {
             // Mostra il pulsante "Return back" se necessario
             if show_return_button {
                 if ui.button("Return back").clicked() {
-
                     if backup_status == BackupStatus::ToConfirm {
                         if state.tx1.send("resetWaiting".to_string()).is_err() {
                             eprintln!("Failed to send message to decoder.");
@@ -471,4 +491,7 @@ fn render_backup_progress(ui: &mut Ui, state: &mut MyApp) {
             app_state.backup_status = BackupStatus::Canceled;
         }
     }
+    let progress = *state.progress.lock().unwrap();
+    ui.add(egui::ProgressBar::new(progress).text(format!("{:.0}%", progress * 100.0)));
+    ui.ctx().request_repaint();
 }

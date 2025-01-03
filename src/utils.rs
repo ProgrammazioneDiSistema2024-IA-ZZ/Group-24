@@ -1,13 +1,13 @@
 use eframe::IconData;
 use image::RgbaImage;
-use std::error::Error;
-use std::path::Path;
-use std::fs;
-use toml;
+use rodio::{source::Source, Decoder, OutputStream};
 use serde::Deserialize;
-use rodio::{Decoder, OutputStream, source::Source};
+use std::error::Error;
+use std::fs;
 use std::fs::File;
 use std::io::BufReader;
+use std::path::Path;
+use toml;
 #[cfg(windows)]
 use winapi::um::winuser::{GetSystemMetrics, SM_CXSCREEN, SM_CYSCREEN};
 #[cfg(not(windows))]
@@ -15,7 +15,7 @@ extern crate x11;
 #[cfg(not(windows))]
 use x11::xlib;
 
-use std::ptr;
+// use std::ptr;
 
 //Questo approccio è specifico per Windows
 pub fn get_screen_resolution() -> Option<(u32, u32)> {
@@ -59,7 +59,9 @@ pub fn play_sound(file_path: &str) {
         if let Ok(file) = File::open(&file_path) {
             let (_stream, stream_handle) = OutputStream::try_default().unwrap();
             let source = Decoder::new(BufReader::new(file)).unwrap();
-            let duration = source.total_duration().unwrap_or_else(|| std::time::Duration::from_secs(3));
+            let duration = source
+                .total_duration()
+                .unwrap_or_else(|| std::time::Duration::from_secs(3));
             stream_handle.play_raw(source.convert_samples()).unwrap();
             std::thread::sleep(duration); // Mantieni il thread attivo
         } else {
@@ -148,16 +150,16 @@ file_types = []
 pub fn load_image_as_icon(path: &str) -> Result<IconData, Box<dyn Error>> {
     // Load the image using the image crate
     let img = image::open(path)?;
-    
+
     // Convert to RGBA8 (RGBA format)
     let rgba_img: RgbaImage = img.to_rgba8();
-    
+
     // Get image dimensions
     let (width, height) = rgba_img.dimensions();
-    
+
     // Convert the RGBA image into raw byte data
     let rgba_data = rgba_img.into_raw();
-    
+
     // Return the IconData structure
     Ok(IconData {
         rgba: rgba_data,
