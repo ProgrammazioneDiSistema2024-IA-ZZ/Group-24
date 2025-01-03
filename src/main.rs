@@ -37,7 +37,17 @@ fn remove_lock_file() {
     if let Err(e) = fs::remove_file(LOCK_FILE_PATH) {
         eprintln!("Failed to remove lock file: {}", e);
     }
+    remove_cpu_log_file();
 }
+
+/// Rimuove il file `cpu_usage_log.csv` se esiste
+fn remove_cpu_log_file() {
+    let file_path = "cpu_usage_log.csv";
+    if let Err(e) = fs::remove_file(file_path) {
+        eprintln!("Failed to remove lock file: {}", e);
+    }
+}
+
 
 fn main() -> Result<(), eframe::Error> {
     // Imposta il panic hook per rimuovere il file di lock in caso di panico
