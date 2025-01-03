@@ -2,6 +2,8 @@ use eframe::egui::{self, Ui};
 use eframe::egui::plot::{Line, Plot, PlotPoints};
 use std::fs;
 
+static mut SHOWN_LOGS: usize = 5;
+
 pub fn show_analytics_panel(ui: &mut Ui) {
     // Usa ScrollArea per tutto il contenuto
     egui::ScrollArea::vertical().show(ui, |ui| {
@@ -100,17 +102,29 @@ pub fn show_analytics_panel(ui: &mut Ui) {
         // Sezione Backup Log
         ui.vertical(|ui| {
             ui.label("Backup Log:");
-            if let Some(backup_entries) = read_backup_log("backup_log.csv") {
-                for entry in backup_entries.iter().take(5) { // Mostra solo i primi 5 log
-                    ui.horizontal(|ui| {
-                        ui.label(format!("Timestamp: {}", entry.timestamp));
-                        ui.label(format!("Duration: {} s", entry.duration));
-                        ui.label(format!("Data: {} bytes", entry.data_transferred));
-                        ui.label(format!("CPU: {:.2} %", entry.cpu_usage));
-                    });
+
+            // Rendi sicura la variabile globale con `unsafe`
+            unsafe {
+                if let Some(backup_entries) = read_backup_log("backup_log.csv") {
+                    for entry in backup_entries.iter().take(SHOWN_LOGS) { // Mostra i log fino a `SHOWN_LOGS`
+                        ui.horizontal(|ui| {
+                            ui.label(format!("Timestamp: {}", entry.timestamp));
+                            ui.label(format!("Duration: {} s", entry.duration));
+                            ui.label(format!("Data: {} bytes", entry.data_transferred));
+                            ui.label(format!("CPU: {:.2} %", entry.cpu_usage));
+                        });
+                    }
+                    if SHOWN_LOGS < backup_entries.len() {
+                        // Aggiungi il pulsante per mostrare più log
+                        if ui.button("Show more logs").clicked() {
+                            SHOWN_LOGS += 5; // Mostra altri 5 log
+                        }
+                    } else {
+                        ui.label("No more logs to display.");
+                    }
+                } else {
+                    ui.label("No backup log data available.");
                 }
-            } else {
-                ui.label("No backup log data available.");
             }
         });
     });
