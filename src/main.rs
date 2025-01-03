@@ -50,8 +50,6 @@ fn remove_cpu_log_file() {
 
 
 fn main() -> Result<(), eframe::Error> {
-
-    remove_cpu_log_file();
     
     // Imposta il panic hook per rimuovere il file di lock in caso di panico
     std::panic::set_hook(Box::new(|panic_info| {
