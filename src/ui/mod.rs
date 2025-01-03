@@ -71,6 +71,7 @@ pub struct MyApp {
     pub tx1: Sender<String>,       // Canale per comunicare col Detector
     pub tx_stop: Sender<String>,   // Canale per inviare lo stop al Backup
     pub progress: Arc<Mutex<f32>>, // Progresso del backup (valore tra 0.0 e 1.0)
+    pub current_file: Arc<Mutex<Option<String>>>, // Nome del file corrente
 }
 
 impl MyApp {
@@ -79,12 +80,14 @@ impl MyApp {
         tx1: Sender<String>,
         tx_stop: Sender<String>,
         progress: Arc<Mutex<f32>>,
+        current_file: Arc<Mutex<Option<String>>>,
     ) -> Self {
         MyApp {
             state,
             tx1,
             tx_stop,
             progress,
+            current_file,
         }
     }
 }
@@ -490,6 +493,12 @@ fn render_backup_progress(ui: &mut Ui, state: &mut MyApp) {
             let mut app_state = state.state.lock().unwrap();
             app_state.backup_status = BackupStatus::Canceled;
         }
+    }
+    // Mostra il percorso completo del file corrente
+    if let Some(current_file) = state.current_file.lock().unwrap().clone() {
+        ui.label(format!("Copying file:: {}", current_file));
+    } else {
+        ui.label("Preparing...");
     }
     let progress = *state.progress.lock().unwrap();
     ui.add(egui::ProgressBar::new(progress).text(format!("{:.0}%", progress * 100.0)));

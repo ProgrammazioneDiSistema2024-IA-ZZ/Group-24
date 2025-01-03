@@ -136,6 +136,10 @@ fn backup_folder_with_stop(
             // Copia il file se rientra nei criteri
             if include_all || matches_file_type(&path, file_types) {
                 println!("Copying file: {:?} -> {:?}", path, dest_path);
+                {
+                    let mut current_file = state.current_file.lock().unwrap();
+                    *current_file = Some(path.to_string_lossy().to_string()); // Salva il percorso completo
+                }
                 fs::copy(&path, &dest_path)?;
 
                 // Controlla l'integrità del file copiato

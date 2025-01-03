@@ -106,6 +106,7 @@ fn main() -> Result<(), eframe::Error> {
     let rx_stop = Arc::new(Mutex::new(rx_stop)); // Incapsula il Receiver
                                                  // Ottieni la configurazione
     let progress = Arc::new(Mutex::new(0.0));
+    let current_file: Arc<Mutex<Option<String>>> = Arc::new(Mutex::new(None));
     let config = manage_configuration_file();
 
     // Crea un `Arc<Mutex<AppState>>` condiviso
@@ -145,12 +146,12 @@ fn main() -> Result<(), eframe::Error> {
 
     let gui_tx = tx1.clone();
     let stop_tx = tx_stop.clone();
-    let progress = progress.clone();
     let my_app = Arc::new(Mutex::new(MyApp::new(
         detector_state,
         gui_tx,
         stop_tx,
         progress.clone(),
+        Arc::clone(&current_file),
     )));
 
     std::thread::spawn(move || {
@@ -176,7 +177,13 @@ fn main() -> Result<(), eframe::Error> {
         let stop_tx = tx_stop.clone();
         let progress = progress.clone();
         let options_for_gui = options.clone();
-        let my_app = MyApp::new(Arc::clone(&shared_state), gui_tx, stop_tx, progress);
+        let my_app = MyApp::new(
+            Arc::clone(&shared_state),
+            gui_tx,
+            stop_tx,
+            progress,
+            Arc::clone(&current_file),
+        );
         eframe::run_native(
             "Group 24 - Backup Application",
             options_for_gui,
@@ -219,7 +226,13 @@ fn main() -> Result<(), eframe::Error> {
         let stop_tx = tx_stop.clone();
         let progress = progress.clone();
         let options_for_gui = options.clone();
-        let my_app = MyApp::new(Arc::clone(&shared_state), gui_tx, stop_tx, progress);
+        let my_app = MyApp::new(
+            Arc::clone(&shared_state),
+            gui_tx,
+            stop_tx,
+            progress,
+            current_file.clone(),
+        );
         eframe::run_native(
             "Group 24 - Backup Application",
             options_for_gui,
