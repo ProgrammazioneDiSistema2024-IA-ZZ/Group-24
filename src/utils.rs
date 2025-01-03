@@ -15,7 +15,7 @@ extern crate x11;
 #[cfg(not(windows))]
 use x11::xlib;
 
-// use std::ptr;
+use std::ptr;
 
 //Questo approccio è specifico per Windows
 pub fn get_screen_resolution() -> Option<(u32, u32)> {
