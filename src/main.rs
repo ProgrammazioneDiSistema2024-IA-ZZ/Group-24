@@ -23,6 +23,9 @@ use std::{fs, process, thread};
 use serde::{Deserialize, Serialize};
 use chrono::{DateTime, Utc};
 use std::time::SystemTime;
+use std::env;
+use std::fs::OpenOptions;
+use std::io::Write;
 
 //single-application
 use signal_hook::consts::signal;
@@ -49,9 +52,43 @@ fn remove_lock_file() {
     }
 }
 
+fn log_message(message: &str) {
+    let log_path = "C:\\Users\\jannu\\Desktop\\backup\\startup_log.txt"; // Sostituisci con il percorso corretto
+    let mut file = OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(log_path)
+        .unwrap();
+    writeln!(file, "{}: {}", chrono::Utc::now(), message).unwrap();
+}
+
+fn log_context() {
+    log_message("Application started");
+    if let Ok(current_dir) = env::current_dir() {
+        log_message(&format!("Current working directory: {:?}", current_dir));
+    }
+    if let Ok(current_user) = env::var("USERNAME") {
+        log_message(&format!("Current user: {:?}", current_user));
+    }
+    if let Ok(home_dir) = env::var("USERPROFILE") {
+        log_message(&format!("User home directory: {:?}", home_dir));
+    }
+}
+
+fn set_working_directory() {
+    //CAMBIARE IL PERCORSO CON QUELLO DOVE SI TROVA L'ESEGUIBILE!
+    let desired_path = "C:\\Users\\jannu\\AppData\\Local\\PDS";
+    if let Err(e) = env::set_current_dir(desired_path) {
+        eprintln!("Failed to set working directory to '{}': {:?}", desired_path, e);
+    } else {
+        println!("Working directory set to '{}'", desired_path);
+    }
+}
+
 
 fn main() -> Result<(), eframe::Error> {
-    
+    set_working_directory(); 
+    log_context(); // Registra il contesto
     // Imposta il panic hook per rimuovere il file di lock in caso di panico
     std::panic::set_hook(Box::new(|panic_info| {
         eprintln!("Panic occurred: {:?}", panic_info);
