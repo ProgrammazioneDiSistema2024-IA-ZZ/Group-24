@@ -75,19 +75,22 @@ fn log_context() {
     }
 }
 
-fn set_working_directory() {
-    //CAMBIARE IL PERCORSO CON QUELLO DOVE SI TROVA L'ESEGUIBILE!
-    let desired_path = "C:\\Users\\jannu\\AppData\\Local\\PDS";
-    if let Err(e) = env::set_current_dir(desired_path) {
-        eprintln!("Failed to set working directory to '{}': {:?}", desired_path, e);
+fn set_working_directory_to_executable() {
+    if let Ok(exe_path) = env::current_exe() {
+        if let Some(exe_dir) = exe_path.parent() {
+            if let Err(e) = env::set_current_dir(exe_dir) {
+                eprintln!("Failed to set working directory to '{}': {:?}", exe_dir.display(), e);
+            } else {
+                println!("Working directory set to '{}'", exe_dir.display());
+            }
+        }
     } else {
-        println!("Working directory set to '{}'", desired_path);
+        eprintln!("Failed to determine executable path.");
     }
 }
 
-
 fn main() -> Result<(), eframe::Error> {
-    set_working_directory(); 
+    set_working_directory_to_executable(); 
     log_context(); // Registra il contesto
     // Imposta il panic hook per rimuovere il file di lock in caso di panico
     std::panic::set_hook(Box::new(|panic_info| {
