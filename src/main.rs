@@ -52,28 +52,6 @@ fn remove_lock_file() {
     }
 }
 
-fn log_message(message: &str) {
-    let log_path = "C:\\Users\\jannu\\Desktop\\backup\\startup_log.txt"; // Sostituisci con il percorso corretto
-    let mut file = OpenOptions::new()
-        .create(true)
-        .append(true)
-        .open(log_path)
-        .unwrap();
-    writeln!(file, "{}: {}", chrono::Utc::now(), message).unwrap();
-}
-
-fn log_context() {
-    log_message("Application started");
-    if let Ok(current_dir) = env::current_dir() {
-        log_message(&format!("Current working directory: {:?}", current_dir));
-    }
-    if let Ok(current_user) = env::var("USERNAME") {
-        log_message(&format!("Current user: {:?}", current_user));
-    }
-    if let Ok(home_dir) = env::var("USERPROFILE") {
-        log_message(&format!("User home directory: {:?}", home_dir));
-    }
-}
 
 fn set_working_directory_to_executable() {
     if let Ok(exe_path) = env::current_exe() {
@@ -91,7 +69,6 @@ fn set_working_directory_to_executable() {
 
 fn main() -> Result<(), eframe::Error> {
     set_working_directory_to_executable(); 
-    log_context(); // Registra il contesto
     // Imposta il panic hook per rimuovere il file di lock in caso di panico
     std::panic::set_hook(Box::new(|panic_info| {
         eprintln!("Panic occurred: {:?}", panic_info);
