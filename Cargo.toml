@@ -21,6 +21,8 @@ systemstat = "0.1"
 sha2 = "0.10"
 x11 = "2.18.0"
 signal-hook = "0.3"
+
+[target.'cfg(windows)'.dependencies]
 winreg = "0.8"
 
 [[bin]]

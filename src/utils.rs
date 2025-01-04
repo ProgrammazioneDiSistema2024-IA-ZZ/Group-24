@@ -6,11 +6,13 @@ use std::sync::{mpsc, Arc, Mutex};
 use std::{error::Error, thread};
 use std::fs::{self, OpenOptions};
 use std::io::{BufReader, Read};
-use winapi::um::sysinfoapi::GetTickCount64;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use std::fs::File;
 use std::path::Path;
+use std::ptr;
 use toml;
+#[cfg(windows)]
+use winapi::um::sysinfoapi::GetTickCount64;
 #[cfg(windows)]
 use winapi::um::winuser::{GetSystemMetrics, SM_CXSCREEN, SM_CYSCREEN};
 #[cfg(not(windows))]
@@ -22,6 +24,7 @@ use crate::ui::AppState;
 use crate::LockFileData;
 
 // Funzione per ottenere il tempo di avvio del sistema
+#[cfg(windows)]
 pub fn get_system_boot_time() -> SystemTime {
     // Ottieni il tempo di attività del sistema in millisecondi
     let uptime_ms = unsafe { GetTickCount64() };
@@ -38,6 +41,25 @@ pub fn get_system_boot_time() -> SystemTime {
     UNIX_EPOCH + rounded_seconds
 }
 
+#[cfg(not(windows))]
+pub fn get_system_boot_time() -> std::time::SystemTime {
+    use std::fs::File;
+    use std::io::Read;
+    use std::time::{Duration, SystemTime, UNIX_EPOCH};
+
+    let mut file = File::open("/proc/uptime").expect("Failed to open /proc/uptime");
+    let mut content = String::new();
+    file.read_to_string(&mut content).unwrap();
+    let uptime_seconds: f64 = content
+        .split_whitespace()
+        .next()
+        .unwrap()
+        .parse()
+        .expect("Failed to parse uptime");
+
+    let now = SystemTime::now();
+    now - Duration::from_secs_f64(uptime_seconds)
+}
 #[cfg(windows)]
 pub fn toggle_auto_start(enable: bool) {
     use winreg::RegKey;
@@ -59,6 +81,43 @@ pub fn toggle_auto_start(enable: bool) {
     }
 }
 
+#[cfg(not(windows))]
+pub fn toggle_auto_start(enable: bool) {
+    use std::fs::{self, OpenOptions};
+    use std::io::Write;
+    use std::env;
+
+    let autostart_dir = format!("{}/.config/autostart", env::var("HOME").unwrap());
+    let autostart_file = format!("{}/BackupGroup24.desktop", autostart_dir);
+
+    if enable {
+        // Crea il file .desktop per l'avvio automatico
+        let desktop_entry = format!(
+            r#"[Desktop Entry]
+            Type=Application
+            Exec={}
+            Hidden=false
+            NoDisplay=false
+            X-GNOME-Autostart-enabled=true
+            Name=BackupGroup24
+            Comment=Backup application"#,
+            env::current_exe().unwrap().to_str().unwrap()
+        );
+
+        fs::create_dir_all(&autostart_dir).unwrap();
+        let mut file = OpenOptions::new()
+            .create(true)
+            .write(true)
+            .truncate(true)
+            .open(&autostart_file)
+            .unwrap();
+        file.write_all(desktop_entry.as_bytes()).unwrap();
+    } else {
+        // Rimuovi il file .desktop
+        let _ = fs::remove_file(&autostart_file);
+    }
+}
+
 #[cfg(windows)]
 pub fn check_auto_start_status() -> bool {
     use winreg::RegKey;
@@ -67,6 +126,16 @@ pub fn check_auto_start_status() -> bool {
     let key = hkcu.open_subkey("Software\\Microsoft\\Windows\\CurrentVersion\\Run").unwrap();
     let program_name = "BackupGroup24"; // Il nome del programma da verificare
     key.get_value::<String, _>(program_name).is_ok()
+}
+
+#[cfg(not(windows))]
+pub fn check_auto_start_status() -> bool {
+    use std::env;
+    let autostart_file = format!(
+        "{}/.config/autostart/BackupGroup24.desktop",
+        env::var("HOME").unwrap()
+    );
+    std::path::Path::new(&autostart_file).exists()
 }
 
 //Questo approccio è specifico per Windows
