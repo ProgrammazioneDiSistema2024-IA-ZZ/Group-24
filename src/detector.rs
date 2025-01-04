@@ -1,6 +1,5 @@
 use crate::confirm_sign;
 use crate::first_sign;
-// use crate::transfer::perform_backup;
 use crate::transfer::perform_backup_with_stop;
 use crate::ui::BackupStatus;
 use crate::ui::MyApp;
@@ -134,9 +133,12 @@ pub fn run(
 
     let segment_count = 20; // Numero di segmenti per lato
 
+    // Ogni volta che un evento si verifica, la closure viene chiamata
     if let Err(error) = listen(move |event| {
         // Controlla se il detector è attivo
         if !detector_running.load(Ordering::Relaxed) {
+            //l'esecuzione del codice all'interno della closure viene interrotta solo per quell'evento
+            //la funzione listen continuerà a ricevere e processare altri eventi
             return;
         }
 

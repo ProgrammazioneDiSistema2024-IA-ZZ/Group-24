@@ -5,6 +5,7 @@ use backup::save_folders;
 use eframe::egui::{self, Color32, Ui};
 use serde::Serialize;
 use std::sync::mpsc::Sender;
+use crate::utils::check_auto_start_status;
 
 use std::{
     process,
@@ -64,6 +65,7 @@ pub struct AppState {
     pub show_confirmation_modal: bool, // utilizzato quando si vuole chiudere l'applicazione
     pub display: bool, // permette di chiudere la GUI, senza terminare l'intero programma. Viene presa dal file di configurazione per una prima installazione
     pub backup_status: BackupStatus,
+    pub auto_start_enabled: bool,
 }
 
 pub struct MyApp {
@@ -117,6 +119,7 @@ impl AppState {
                     show_confirmation_modal: false,
                     display: true,
                     backup_status: BackupStatus::NotStarted,
+                    auto_start_enabled: check_auto_start_status(),
                 }
             }
             _ => Self {
@@ -136,6 +139,7 @@ impl AppState {
                 show_confirmation_modal: false,
                 display: true,
                 backup_status: BackupStatus::NotStarted,
+                auto_start_enabled: check_auto_start_status(),
             },
         }
     }
@@ -247,7 +251,7 @@ fn render_main_content(ctx: &egui::Context, state: &mut AppState) {
         match state.current_panel {
             PanelType::Backup => backup::show_backup_panel(ui, state),
             PanelType::Analytics => analytics::show_analytics_panel(ui),
-            PanelType::Info => info::show_info_panel(ui),
+            PanelType::Info => info::show_info_panel(ui, state),
         }
     });
 }
@@ -379,18 +383,9 @@ pub fn render_modal_exit(ctx: &egui::Context, state: &mut MyApp, frame: &mut efr
 }
 
 // Function to display the error message panel
-pub fn exit_panel(ctx: &egui::Context, state: &MyApp, error_message: &str) {
-    let show_confirmation_modal;
-    //per rilasciare il lock
-    {
-        show_confirmation_modal = state.state.lock().unwrap().show_confirmation_modal.clone();
-    }
-
+pub fn exit_panel(ctx: &egui::Context, _state: &MyApp, error_message: &str) {
     egui::CentralPanel::default().show(ctx, |ui| {
         ui.vertical_centered(|ui| {
-            if show_confirmation_modal {
-                ui.set_enabled(false);
-            }
 
             ui.label("An error occurred:");
             ui.label(error_message); // Display the error message

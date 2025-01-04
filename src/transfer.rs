@@ -3,7 +3,6 @@ use crate::ui::MyApp;
 use crate::utils::manage_configuration_file;
 use crate::utils::play_sound;
 use crate::utils::Configuration;
-// use eframe::egui::mutex::Mutex;
 use sha2::{Digest, Sha256};
 use std::fs;
 use std::fs::File;

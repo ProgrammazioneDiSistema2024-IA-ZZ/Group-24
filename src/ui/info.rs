@@ -1,8 +1,24 @@
 use eframe::egui::{self, RichText};
 use egui::Color32;
+use crate::ui::AppState;
+use crate::utils::toggle_auto_start;
 
 /// Show the info panel
-pub fn show_info_panel(ui: &mut egui::Ui) {
+pub fn show_info_panel(ui: &mut egui::Ui, state: &mut AppState) {
+
+    //------------ AVVIO AUTOMATICO ---------------
+    let mut auto_start_enabled = state.auto_start_enabled;
+    // Checkbox per abilitare/disabilitare l'auto-start
+    ui.checkbox(&mut auto_start_enabled, "Avvio automatico all'avvio del sistema");
+
+    // Quando l'utente cambia lo stato della checkbox, aggiorniamo la configurazione
+    if auto_start_enabled != state.auto_start_enabled {
+        state.auto_start_enabled = auto_start_enabled;
+        toggle_auto_start(auto_start_enabled); // Cambia il registro di Windows
+    }
+    ui.separator(); // Separatore tra le sezioni
+
+    // ------------ MOSTRA INFORMAZIONI ----------------
     ui.label(
         RichText::new("Welcome to Backup")
             .color(Color32::from_rgb(0x87, 0xCE, 0xFA))

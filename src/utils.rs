@@ -2,10 +2,13 @@ use eframe::IconData;
 use image::RgbaImage;
 use rodio::{source::Source, Decoder, OutputStream};
 use serde::Deserialize;
-use std::error::Error;
-use std::fs;
+use std::sync::{mpsc, Arc, Mutex};
+use std::{error::Error, thread};
+use std::fs::{self, OpenOptions};
+use std::io::{BufReader, Read};
+use winapi::um::sysinfoapi::GetTickCount64;
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use std::fs::File;
-use std::io::BufReader;
 use std::path::Path;
 use toml;
 #[cfg(windows)]
@@ -14,6 +17,57 @@ use winapi::um::winuser::{GetSystemMetrics, SM_CXSCREEN, SM_CYSCREEN};
 extern crate x11;
 #[cfg(not(windows))]
 use x11::xlib;
+
+use crate::ui::AppState;
+use crate::LockFileData;
+
+// Funzione per ottenere il tempo di avvio del sistema
+pub fn get_system_boot_time() -> SystemTime {
+    // Ottieni il tempo di attività del sistema in millisecondi
+    let uptime_ms = unsafe { GetTickCount64() };
+    let now = SystemTime::now();        // può generare discrepanza
+    
+    // Calcola il tempo di boot
+    let boot_time = now - Duration::from_millis(uptime_ms);
+    
+    // Azzera i millisecondi --> per evitare discrepanze 
+    let duration_since_epoch = boot_time
+        .duration_since(UNIX_EPOCH)
+        .unwrap_or_else(|_| Duration::new(0, 0));
+    let rounded_seconds = Duration::new(duration_since_epoch.as_secs(), 0);
+    UNIX_EPOCH + rounded_seconds
+}
+
+#[cfg(windows)]
+pub fn toggle_auto_start(enable: bool) {
+    use winreg::RegKey;
+    use winreg::enums::*;
+    use std::env;
+
+    let hkcu = RegKey::predef(HKEY_CURRENT_USER);
+    let key = hkcu.open_subkey_with_flags("Software\\Microsoft\\Windows\\CurrentVersion\\Run", KEY_SET_VALUE).unwrap();
+    let program_name = "BackupGroup24"; // Nome della tua applicazione
+    
+    // Ottieni il percorso dell'eseguibile dinamicamente
+    let current_dir = env::current_exe().unwrap();
+    let app_path = current_dir.to_str().unwrap(); // Converte il percorso in stringa
+
+    if enable {
+        key.set_value(program_name, &app_path).unwrap();
+    } else {
+        key.delete_value(program_name).unwrap();
+    }
+}
+
+#[cfg(windows)]
+pub fn check_auto_start_status() -> bool {
+    use winreg::RegKey;
+    use winreg::enums::*;
+    let hkcu = RegKey::predef(HKEY_CURRENT_USER);
+    let key = hkcu.open_subkey("Software\\Microsoft\\Windows\\CurrentVersion\\Run").unwrap();
+    let program_name = "BackupGroup24"; // Il nome del programma da verificare
+    key.get_value::<String, _>(program_name).is_ok()
+}
 
 //Questo approccio è specifico per Windows
 pub fn get_screen_resolution() -> Option<(u32, u32)> {
@@ -164,4 +218,67 @@ pub fn load_image_as_icon(path: &str) -> Result<IconData, Box<dyn Error>> {
         width,
         height,
     })
+}
+
+pub fn monitor_lock_file(lock_file_path: &'static str, shared_state: Arc<Mutex<AppState>>, tx: mpsc::Sender<String>) {
+    thread::spawn(move || {
+        // Ottieni l'ultimo tempo di modifica del file di lock
+        let mut last_modified = fs::metadata(lock_file_path)
+            .and_then(|metadata| Ok(metadata.modified().unwrap()))
+            .unwrap_or_else(|_| SystemTime::now());
+
+        loop {
+            // Controlla se il file è stato modificato
+            if let Ok(metadata) = fs::metadata(lock_file_path) {
+                let modified = metadata.modified().unwrap();
+                if modified > last_modified {
+                    last_modified = modified;
+
+                    // Leggi il contenuto del file TOML
+                    if let Ok(mut file) = OpenOptions::new().read(true).open(lock_file_path) {
+                        let mut content = String::new();
+                        if let Ok(_) = file.read_to_string(&mut content) {
+                            // Analizza il file TOML
+                            if let Ok(mut parsed_data) = toml::from_str::<LockFileData>(&content) {
+                                // Verifica se il campo show_gui è true
+                                if parsed_data.show_gui {
+                                    // Controlla lo stato della GUI prima di inviare il messaggio
+                                    let mut state = shared_state.lock().unwrap();
+                                    if !state.display {
+                                        if let Err(err) = tx.send("showGUI".to_string()) {
+                                            eprintln!("Failed to send showGUI message: {}", err);
+                                            state.display = false; // Assicurati che lo stato rifletta correttamente il fallimento
+                                        } else {
+                                            println!("Message sent to show GUI.");
+                                        }
+                                    } else {
+                                        println!("GUI already active. Skipping message from lock file.");
+                                    }
+
+                                    // Imposta show_gui a false nel file
+                                    parsed_data.show_gui = false;
+
+                                    // Scrivi il file aggiornato
+                                    if let Ok(updated_content) = toml::to_string(&parsed_data) {
+                                        if let Err(e) = fs::write(lock_file_path, updated_content) {
+                                            eprintln!("Failed to update lock file: {}", e);
+                                        } else {
+                                            println!("Lock file updated successfully.");
+                                        }
+                                    }
+                                } else {
+                                    println!("showGUI is false. No action taken.");
+                                }
+                            } else {
+                                eprintln!("Failed to parse lock file content.");
+                            }
+                        } else {
+                            eprintln!("Failed to read lock file.");
+                        }
+                    }
+                }
+            }
+            thread::sleep(Duration::from_secs(1)); // Controlla ogni secondo
+        }
+    });
 }

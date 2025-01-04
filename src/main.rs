@@ -17,33 +17,34 @@ use std::path::Path;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc;
 use std::sync::{Arc, Mutex};
-use std::{fs, process, thread};
 use ui::BackupStatus;
-use utils::load_image_as_icon;
-use utils::manage_configuration_file;
-use utils::Configuration;
+use utils::{load_image_as_icon, manage_configuration_file, get_system_boot_time, Configuration};
+use std::{fs, process, thread};
+use serde::{Deserialize, Serialize};
+use chrono::{DateTime, Utc};
+use std::time::SystemTime;
 
 //single-application
 use signal_hook::consts::signal;
 #[cfg(windows)]
 use signal_hook::flag;
 #[cfg(not(windows))]
-use signal_hook::iterator::Signals; //da verificare
+use signal_hook::iterator::Signals;
 
-static LOCK_FILE_PATH: &str = ".app.lock"; // Il file di lock che indica se un'istanza è in esecuzione
+#[derive(Deserialize, Serialize)]
+struct LockFileData {
+    boot_time: String,  // supponiamo che il tempo di avvio sia una stringa in formato ISO 8601
+    show_gui: bool,
+}
+
+static LOCK_FILE_PATH: &str = "lock.toml";   // Il file di lock che indica se un'istanza è in esecuzione
 
 // Funzione che rimuove il file di lock
 fn remove_lock_file() {
     if let Err(e) = fs::remove_file(LOCK_FILE_PATH) {
         eprintln!("Failed to remove lock file: {}", e);
     }
-    remove_cpu_log_file();
-}
-
-/// Rimuove il file `cpu_usage_log.csv` se esiste
-fn remove_cpu_log_file() {
-    let file_path = "cpu_usage_log.csv";
-    if let Err(e) = fs::remove_file(file_path) {
+    if let Err(e) = fs::remove_file("cpu_usage_log.csv") {
         eprintln!("Failed to remove lock file: {}", e);
     }
 }
@@ -58,17 +59,76 @@ fn main() -> Result<(), eframe::Error> {
     }));
 
     /* --- SINGOLA APPLICAZIONE --- */
+    // Ottieni il tempo di avvio corrente
+    let current_boot_time = get_system_boot_time();
+    println!("{:?}", current_boot_time);
+
     // Controlla se il file di lock esiste
     if Path::new(LOCK_FILE_PATH).exists() {
-        println!("Another instance of this program is already running.");
-        process::exit(1); // Esce se esiste già un'istanza in esecuzione
+        // Leggi il file lock.toml
+        if let Ok(content) = fs::read_to_string(LOCK_FILE_PATH) {
+            if let Ok(mut lock_data) = toml::from_str::<LockFileData>(&content) {
+                if let Ok(saved_boot_time) = lock_data.boot_time.parse::<DateTime<Utc>>() {
+                    // Converti saved_boot_time in SystemTime
+                    let saved_boot_time_as_system_time = SystemTime::from(saved_boot_time);
+
+                    println!("{:?}", saved_boot_time_as_system_time);
+
+                    if current_boot_time > saved_boot_time_as_system_time {
+                        // Boot time corrente maggiore: sovrascrivi `boot_time` e apri la GUI
+                        lock_data.boot_time = format!("{}", DateTime::<Utc>::from(current_boot_time));
+                        lock_data.show_gui = false; // Resetta il flag di GUI
+    
+                        if let Ok(updated_content) = toml::to_string(&lock_data) {
+                            if let Err(e) = fs::write(LOCK_FILE_PATH, updated_content) {
+                                eprintln!("Failed to update lock file: {}", e);
+                            } else {
+                                println!("Lock file updated with new boot_time.");
+                            }
+                        }
+                        println!("System boot time is newer. Opening GUI...");
+                        println!("Application is running...");
+                    } else {
+                        // Boot time identico o inferiore: segna `show_gui = true`
+                        lock_data.show_gui = true;
+                        if let Ok(updated_content) = toml::to_string(&lock_data) {
+                            if let Err(e) = fs::write(LOCK_FILE_PATH, updated_content) {
+                                eprintln!("Failed to update lock file: {}", e);
+                            } else {
+                                println!("Lock file updated: show_gui = true.");
+                            }
+                        }
+                        process::exit(0); // Esci senza aprire una nuova istanza
+                    }
+
+                } else {
+                    eprintln!("Failed to parse saved boot_time.");
+                    process::exit(1);
+                }
+            } else {
+                eprintln!("Failed to parse lock file.");
+                process::exit(1);
+            }
+        } else {
+            eprintln!("Failed to read lock file.");
+            process::exit(1);
+        }
+    } else {
+        // Crea un nuovo file lock.toml
+        let lock_data = LockFileData {
+            boot_time: format!("{}", DateTime::<Utc>::from(current_boot_time)),
+            show_gui: false,
+        };
+        if let Ok(content) = toml::to_string(&lock_data) {
+            if let Err(e) = fs::write(LOCK_FILE_PATH, content) {
+                eprintln!("Failed to create lock file: {}", e);
+                process::exit(1);
+            } else {
+                println!("Lock file created. Application started.");
+                println!("Application is running...");
+            }
+        }
     }
-    // Crea il file di lock per segnare che l'app è in esecuzione
-    if let Err(e) = fs::write(LOCK_FILE_PATH, "locked") {
-        eprintln!("Failed to create lock file: {}", e);
-        process::exit(1); // Esci se non riesci a creare il file di lock
-    }
-    println!("Application is running...");
 
     // Gestione dei segnali
     #[cfg(not(windows))]
@@ -132,6 +192,11 @@ fn main() -> Result<(), eframe::Error> {
         }
     }));
 
+    // Avvia thread per controllo GUI, per mostrare user panel
+    let monitor_state = Arc::clone(&shared_state);
+    let monitor_tx = tx.clone(); 
+    utils::monitor_lock_file(LOCK_FILE_PATH, monitor_state, monitor_tx);
+
     // Load the application icon
     let icon_result = load_image_as_icon("images/icon.png");
 
@@ -154,6 +219,8 @@ fn main() -> Result<(), eframe::Error> {
     let detector_state = Arc::clone(&shared_state);
     // Cloniamo il trasmettitore per il detector
     let detector_tx = tx.clone();
+    // Per tereminare il backup
+    let rx_stop_clone = Arc::clone(&rx_stop);
 
     let gui_tx = tx1.clone();
     let stop_tx = tx_stop.clone();
@@ -166,7 +233,7 @@ fn main() -> Result<(), eframe::Error> {
     )));
 
     std::thread::spawn(move || {
-        let rx_stop_clone = Arc::clone(&rx_stop);
+        
         println!("Starting detector...");
         detector::run(
             my_app,
@@ -176,11 +243,10 @@ fn main() -> Result<(), eframe::Error> {
             Arc::new(AtomicBool::new(true)),
         );
     });
-    let run_gui;
-    //per rilasciare il lock
-    {
-        run_gui = shared_state.lock().unwrap().display.clone(); //viene presa dal file di configurazione
-    }
+
+    let run_gui =  {
+        shared_state.lock().unwrap().display.clone()     //viene presa dal file di configurazione
+    };
 
     if run_gui {
         println!("GUI started for the first time.");
