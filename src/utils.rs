@@ -50,6 +50,7 @@ pub fn get_system_boot_time() -> std::time::SystemTime {
     let mut file = File::open("/proc/uptime").expect("Failed to open /proc/uptime");
     let mut content = String::new();
     file.read_to_string(&mut content).unwrap();
+
     let uptime_seconds: f64 = content
         .split_whitespace()
         .next()
@@ -57,9 +58,22 @@ pub fn get_system_boot_time() -> std::time::SystemTime {
         .parse()
         .expect("Failed to parse uptime");
 
+    // Ottieni il tempo corrente
     let now = SystemTime::now();
-    now - Duration::from_secs_f64(uptime_seconds)
+
+    // Calcola il tempo di boot
+    let boot_time = now - Duration::from_secs_f64(uptime_seconds);
+
+    // Arrotonda al secondo più vicino
+    let duration_since_epoch = boot_time
+        .duration_since(UNIX_EPOCH)
+        .unwrap_or_else(|_| Duration::new(0, 0));
+    let rounded_seconds = duration_since_epoch.as_secs(); // Arrotondamento verso il basso
+
+    UNIX_EPOCH + Duration::from_secs(rounded_seconds)
 }
+
+
 #[cfg(windows)]
 pub fn toggle_auto_start(enable: bool) {
     use winreg::RegKey;
