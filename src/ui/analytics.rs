@@ -73,15 +73,24 @@ pub fn show_analytics_panel(ui: &mut Ui) {
                             ui.end_row();                           // Fine della riga
                         }
                     });
-            
+            ui.horizontal(|ui| {
                 // Aggiungi il pulsante per vedere più log (i 5 valori più vecchi)
                 unsafe {
                     if SHOWN_LOGS_CPU < total_points {
-                        if ui.button("Show older logs").clicked() {
+                        if ui.button("Show more").clicked() {
                             SHOWN_LOGS_CPU += 5; // Mostra 5 log in più
                         }
                     }
                 }
+                // Mostra il pulsante per ripristinare i log a 5
+                unsafe {
+                    if SHOWN_LOGS_CPU > 5 {
+                        if ui.button("Show less").clicked() {
+                            SHOWN_LOGS_CPU = 5; // Ripristina a 5 log
+                        }
+                    }
+                }
+            });
             } else {
                 ui.label("No CPU usage data available.");
             }
@@ -121,15 +130,20 @@ pub fn show_analytics_panel(ui: &mut Ui) {
                                 ui.end_row(); // Fine della riga
                             }
                         });
-
+                ui.horizontal(|ui| {
                     // Aggiungi il pulsante per mostrare più log se ce ne sono
                     if SHOWN_LOGS_BACKUP < total_entries {
-                        if ui.button("Show more logs").clicked() {
+                        if ui.button("Show more").clicked() {
                             SHOWN_LOGS_BACKUP += 5; // Mostra altri 5 log
                         }
-                    } else {
-                        ui.label("No more logs to display.");
+                    } 
+                    // Mostra il pulsante per ripristinare i log a 5
+                    if SHOWN_LOGS_BACKUP > 5 {
+                        if ui.button("Show less").clicked() {
+                            SHOWN_LOGS_BACKUP = 5; // Ripristina a 5 log
+                        }
                     }
+                });
                 } else {
                     ui.label("No backup log data available.");
                 }
