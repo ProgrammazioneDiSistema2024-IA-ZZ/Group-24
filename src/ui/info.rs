@@ -1,7 +1,7 @@
 use eframe::egui::{self, RichText};
 use egui::Color32;
 use crate::ui::AppState;
-use crate::utils::toggle_auto_start;
+use crate::utils::{toggle_auto_start, update_lock_file_display};
 
 /// Show the info panel
 pub fn show_info_panel(ui: &mut egui::Ui, state: &mut AppState) {
@@ -16,6 +16,22 @@ pub fn show_info_panel(ui: &mut egui::Ui, state: &mut AppState) {
         state.auto_start_enabled = auto_start_enabled;
         toggle_auto_start(auto_start_enabled); // Cambia il registro di Windows
     }
+    ui.separator(); // Separatore tra le sezioni
+
+    // ------------ ESEGUI GUI ALL'AVVIO ---------------
+    let mut run_gui_enabled = state.run_gui;
+    // Checkbox per abilitare/disabilitare l'esecuzione della GUI all'avvio
+    ui.checkbox(&mut run_gui_enabled, "Esegui GUI all'avvio");
+
+    // Quando l'utente cambia lo stato della checkbox, aggiorniamo la configurazione
+    if run_gui_enabled != state.run_gui {
+        state.run_gui = run_gui_enabled;
+
+        if let Err(_err) = update_lock_file_display(run_gui_enabled) {
+            ui.colored_label(egui::Color32::RED, "Errore di aggiornamento.");
+        }
+    }
+
     ui.separator(); // Separatore tra le sezioni
 
     // ------------ MOSTRA INFORMAZIONI ----------------

@@ -5,12 +5,10 @@ use serde::Deserialize;
 use std::sync::{mpsc, Arc, Mutex};
 use std::{error::Error, thread};
 use std::fs::{self, OpenOptions};
-use std::io::{BufReader, Read};
+use std::io::{self, BufReader, Read, Write};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use std::fs::File;
 use std::path::Path;
-use std::ptr;
-use toml;
 #[cfg(windows)]
 use winapi::um::sysinfoapi::GetTickCount64;
 #[cfg(windows)]
@@ -364,4 +362,46 @@ pub fn monitor_lock_file(lock_file_path: &'static str, shared_state: Arc<Mutex<A
             thread::sleep(Duration::from_secs(1)); // Controlla ogni secondo
         }
     });
+}
+
+pub fn update_lock_file_display(display: bool) -> io::Result<()> {
+    // Carichiamo il contenuto del file lock.toml
+    let path = "lock.toml"; // Modifica il percorso se necessario
+    let content = fs::read_to_string(path)?;
+
+    // Deserializziamo il contenuto in un'istanza di LockFileData
+    let mut lock_file_data: LockFileData = toml::from_str(&content)
+        .map_err(|err| io::Error::new(io::ErrorKind::InvalidData, err.to_string()))?;
+
+    // Aggiorniamo il valore del campo `display`
+    lock_file_data.display = display;
+
+    // Serializziamo di nuovo i dati aggiornati
+    let updated_content = toml::to_string(&lock_file_data)
+        .map_err(|err| io::Error::new(io::ErrorKind::Other, err.to_string()))?;
+
+    // Scriviamo i dati aggiornati nel file lock.toml
+    let mut file = fs::File::create(path)?;
+    file.write_all(updated_content.as_bytes())?;
+
+    Ok(())
+}
+
+pub fn read_lock_file_display() -> bool {
+    // Percorso del file lock.toml
+    let path = "lock.toml"; // Modifica il percorso se necessario
+
+    // Carichiamo il contenuto del file lock.toml
+    let content = fs::read_to_string(path);
+    if content.is_err() {
+        return false; // Fallimento nella lettura del file
+    }
+
+    // Deserializziamo il contenuto in un'istanza di LockFileData
+    let lock_file_data: Result<LockFileData, _> = toml::from_str(&content.unwrap());
+    if let Ok(data) = lock_file_data {
+        return data.display; // Restituisce il valore del campo `display`
+    }
+
+    false // Fallimento nella deserializzazione o assenza del campo `display`
 }

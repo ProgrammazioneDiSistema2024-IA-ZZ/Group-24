@@ -5,7 +5,7 @@ use backup::save_folders;
 use eframe::egui::{self, Color32, Ui};
 use serde::Serialize;
 use std::sync::mpsc::Sender;
-use crate::utils::check_auto_start_status;
+use crate::utils::{check_auto_start_status, read_lock_file_display};
 
 use std::{
     process,
@@ -66,6 +66,7 @@ pub struct AppState {
     pub display: bool, // permette di chiudere la GUI, senza terminare l'intero programma. Viene presa dal file di configurazione per una prima installazione
     pub backup_status: BackupStatus,
     pub auto_start_enabled: bool,
+    pub run_gui: bool,
 }
 
 pub struct MyApp {
@@ -120,6 +121,7 @@ impl AppState {
                     display: true,
                     backup_status: BackupStatus::NotStarted,
                     auto_start_enabled: check_auto_start_status(),
+                    run_gui: read_lock_file_display(),
                 }
             }
             _ => Self {
@@ -140,6 +142,7 @@ impl AppState {
                 display: true,
                 backup_status: BackupStatus::NotStarted,
                 auto_start_enabled: check_auto_start_status(),
+                run_gui: read_lock_file_display(),
             },
         }
     }
