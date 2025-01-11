@@ -70,9 +70,9 @@ pub fn show_info_panel(ui: &mut egui::Ui, state: &mut AppState) {
             .text_style(egui::TextStyle::Heading),
     );
 
-    ui.label("In the Analytics Panel, you can monitor the status and progress of your backup operation. These statistics include:");
-    ui.label("- The total number of files copied.");
-    ui.label("- The current progress of the backup (shown as a percentage).");
-    ui.label("- Any errors or interruptions in the process.");
-    ui.label("These statistics help ensure the backup is running smoothly.");
+    ui.label("The monitoring system provides comprehensive and user-friendly control over operations.");
+    ui.label("It includes an analytics panel that displays CPU usage statistics, backup history, and detailed information about recent activities.");
+    ui.label("During a backup process, the system offers real-time updates on the progress percentage, allowing users to track the operation's advancement.");
+    ui.label("Additionally, it promptly alerts users to any errors or anomalies, ensuring timely and secure management of critical tasks.");
+
 }
