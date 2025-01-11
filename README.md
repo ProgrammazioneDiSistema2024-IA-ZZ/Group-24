@@ -26,3 +26,20 @@ L'applicazione offre le seguenti funzionalità:
   - Storico delle operazioni di backup visualizzando i log storici dei backup, con informazioni su durata, dati trasferiti e uso della CPU, consentendo di monitorare l'andamento delle operazioni passate e accedere ai dettagli più significativi.
 
 - **Notifiche di errore e anomalie**: L'applicazione avvisa immediatamente l'utente di eventuali errori o anomalie durante l'esecuzione del backup.
+
+## Compatibilità
+L'applicazione è compatibile con i seguenti sistemi operativi:
+- Windows 10 o versioni successive
+- Linux (distribuzioni principali come Ubuntu, Fedora, etc.)
+- MacOS (versioni supportate)
+
+## Installazione
+Per installare l'applicazione, segui questi passaggi:
+1. blablabla
+
+## Schermate
+Ecco alcune schermate dell'applicazione:
+![Schermata 1](screenshot1.png)
+![Schermata 2](screenshot2.png)
+
+
