@@ -41,6 +41,7 @@ Per installare l'applicazione, segui questi passaggi:
 
 ## Schermate
 Ecco alcune schermate dell'applicazione:
+
 La prima schermata (Info Panel) fornisce una panoramica generale dell'applicazione e delle sue funzionalità principali.
 ![Info Panel ](images/InfoPanel.png)
 
