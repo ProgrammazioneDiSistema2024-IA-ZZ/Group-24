@@ -51,7 +51,7 @@ pub fn show_info_panel(ui: &mut egui::Ui, state: &mut AppState) {
     );
 
     ui.strong("Source Folder");
-    ui.label("In the Main Panel, you can select the source folder, which contains the files to be backed up. This is where the files will be read from.");
+    ui.label("In the Backup Panel, you can select the source folder, which contains the files to be backed up. This is where the files will be read from.");
 
     ui.strong("Destination Folder");
     ui.label("Choose the destination folder where the files will be stored. Ensure this folder is correctly set to avoid overwriting important data.");
