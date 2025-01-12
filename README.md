@@ -33,7 +33,7 @@ L'applicazione offre le seguenti funzionalità:
 L'applicazione è compatibile con i seguenti sistemi operativi:
 - Windows 10 o versioni successive
 - Linux (distribuzioni principali come Ubuntu, Fedora, etc.)
-- MacOS (versioni supportate)
+- MacOS (versioni supportate) ?????
 
 ## Installazione
 Per installare l'applicazione, segui questi passaggi:
