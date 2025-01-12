@@ -25,6 +25,8 @@ L'applicazione offre le seguenti funzionalità:
   - Statistiche di utilizzo della CPU mostrando le statistiche minime, massime e medie dell'uso della CPU, permettendo un'analisi delle prestazioni del sistema in tempo reale.
   - Storico delle operazioni di backup visualizzando i log storici dei backup, con informazioni su durata, dati trasferiti e uso della CPU, consentendo di monitorare l'andamento delle operazioni passate e accedere ai dettagli più significativi.
 
+-**Avvio automatico con il sistema**: Attraverso l'Info Panel, è possibile flaggare una casella per configurare l'avvio automatico dell'applicazione all'accensione del sistema, garantendo che il software sia operativo sin dall'inizio e sempre pronto per eseguire backup.
+
 - **Notifiche di errore e anomalie**: L'applicazione avvisa immediatamente l'utente di eventuali errori o anomalie durante l'esecuzione del backup.
 
 ## Compatibilità
@@ -39,6 +41,9 @@ Per installare l'applicazione, segui questi passaggi:
 
 ## Schermate
 Ecco alcune schermate dell'applicazione:
+La prima schermata (Info Panel) fornisce una panoramica generale dell'applicazione e delle sue funzionalità principali.
+![Info Panel ](images/InfoPanel.png)
+
 Nella schermata di configurazione del backup puoi selezionare la cartella di origine (source folder), quella di destinazione (destination folder) e specificare le estensioni dei file da salvare (ad esempio .txt, .jpg), oppure lasciare 'all' per includere tutti i file.
 ![Backup_Panel](images/backuppanel.png)
 
@@ -53,6 +58,7 @@ Al termine del backup, viene visualizzata una schermata di conferma che indica i
 
 Questa schermata consente di monitorare le performance del sistema e tenere traccia della cronologia dei backup.
 ![Analytics](images/analyticsPanel.png)
+
 
 
 
