@@ -39,11 +39,11 @@ Per installare l'applicazione, segui questi passaggi:
 
 ## Schermate
 Ecco alcune schermate dell'applicazione:
-![Backup_Panel](backuppanel.png)
-![Configuration](customFiles.png)
-![Backup_Progress](backupProgress.png)
-![Backup_Completed](backupCompleted.png)
-![Analytics](analyticsPanel.png)
+![Backup_Panel](images/backuppanel.png)
+![Configuration](images/customFiles.png)
+![Backup_Progress](images/backupProgress.png)
+![Backup_Completed](images/backupCompleted.png)
+![Analytics](images/analyticsPanel.png)
 
 
 
