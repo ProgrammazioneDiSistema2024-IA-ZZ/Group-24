@@ -25,7 +25,7 @@ L'applicazione offre le seguenti funzionalità:
   - Statistiche di utilizzo della CPU mostrando le statistiche minime, massime e medie dell'uso della CPU, permettendo un'analisi delle prestazioni del sistema in tempo reale.
   - Storico delle operazioni di backup visualizzando i log storici dei backup, con informazioni su durata, dati trasferiti e uso della CPU, consentendo di monitorare l'andamento delle operazioni passate e accedere ai dettagli più significativi.
 
--**Avvio automatico con il sistema**: Attraverso l'Info Panel, è possibile flaggare una casella per configurare l'avvio automatico dell'applicazione all'accensione del sistema, garantendo che il software sia operativo sin dall'inizio e sempre pronto per eseguire backup.
+- **Avvio automatico con il sistema**: Attraverso l'Info Panel, è possibile flaggare una casella per configurare l'avvio automatico dell'applicazione all'accensione del sistema, garantendo che il software sia operativo sin dall'inizio e sempre pronto per eseguire backup.
 
 - **Notifiche di errore e anomalie**: L'applicazione avvisa immediatamente l'utente di eventuali errori o anomalie durante l'esecuzione del backup.
 
