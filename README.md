@@ -39,7 +39,13 @@ Per installare l'applicazione, segui questi passaggi:
 
 ## Schermate
 Ecco alcune schermate dell'applicazione:
-![Schermata 1](screenshot1.png)
-![Schermata 2](screenshot2.png)
+![Backup_Panel](backuppanel.png)
+![Configuration](customFiles.png)
+![Backup_Progress](backupProgress.png)
+![Backup_Completed](backupCompleted.png)
+![Analytics](analyticsPanel.png)
+
+
+
 
 
