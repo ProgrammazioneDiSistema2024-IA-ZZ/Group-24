@@ -41,12 +41,16 @@ Per installare l'applicazione, segui questi passaggi:
 Ecco alcune schermate dell'applicazione:
 Nella schermata di configurazione del backup puoi selezionare la cartella di origine (source folder), quella di destinazione (destination folder) e specificare le estensioni dei file da salvare (ad esempio .txt, .jpg), oppure lasciare 'all' per includere tutti i file.
 ![Backup_Panel](images/backuppanel.png)
+
 Puoi scegliere "Custom" per specificare manualmente le estensioni da salvare (ad esempio .txt, .jpg)
 ![Configuration](images/customFiles.png)
+
 Appena avviato il backup, viene mostrata una barra di progresso che indica lo stato dell'operazione, consentendo di monitorare in tempo reale l'avanzamento del processo; inoltre, hai la possibilità di interrompere il backup in qualsiasi momento tramite il bottone stop.
 ![Backup_Progress](images/backupProgress.png)
+
 Al termine del backup, viene visualizzata una schermata di conferma che indica il completamento dell'operazione.
 ![Backup_Completed](images/backupCompleted.png)
+
 Questa schermata consente di monitorare le performance del sistema e tenere traccia della cronologia dei backup.
 ![Analytics](images/analyticsPanel.png)
 
