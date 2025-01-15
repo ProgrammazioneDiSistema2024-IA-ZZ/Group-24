@@ -48,7 +48,7 @@ pub fn perform_backup_with_stop(
         let start_time = Instant::now();
 
         // Riproduci suono di inizio backup
-        play_sound("Sounds/bubblepop-254773.mp3");
+        play_sound("../../Sounds/bubblepop-254773.mp3");
 
         // Conta i file da copiare
         let total_files = count_files_in_directory(source_path).unwrap();
@@ -67,10 +67,10 @@ pub fn perform_backup_with_stop(
             state,
             &mut total_copied_size,
         ) {
-            play_sound("Sounds/incorrect-buzzer-sound-147336.mp3");
+            play_sound("../../Sounds/incorrect-buzzer-sound-147336.mp3");
             return Err(format!("Backup failed: {}", e));
         } else {
-            play_sound("Sounds/bellding-254774.mp3");
+            play_sound("../../Sounds/bellding-254774.mp3");
             let duration = start_time.elapsed().as_secs(); // Durata del backup in secondi
 
             // let total_size = get_total_size(source_path).map_err(|e| e.to_string())?; // Calcola i dati trasferiti in byte
@@ -109,7 +109,7 @@ fn backup_folder_with_stop(
         // Controlla se è stato ricevuto il comando di stop
         if let Ok(msg) = stop_rx.try_recv() {
             if msg == "stop" {
-                play_sound("Sounds/incorrect-buzzer-sound-147336.mp3");
+                play_sound("../../Sounds/incorrect-buzzer-sound-147336.mp3");
                 return Err(io::Error::new(
                     io::ErrorKind::Interrupted,
                     "Backup interrotto dall'utente.",

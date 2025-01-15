@@ -171,7 +171,7 @@ pub fn run(
                     let edges = edges_tracker.lock().unwrap();
 
                     if edges.is_contour_complete(screen_width, screen_height, segment_count) {
-                        utils::play_sound("Sounds/system-notification-199277.mp3");
+                        utils::play_sound("../../Sounds/system-notification-199277.mp3");
                         {
                             let state = shared_state.lock().unwrap();
                             let mut state = state.state.lock().unwrap();
