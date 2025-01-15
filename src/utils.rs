@@ -2,14 +2,14 @@ use eframe::IconData;
 use image::RgbaImage;
 use rodio::{source::Source, Decoder, OutputStream};
 use serde::Deserialize;
-use std::sync::{mpsc, Arc, Mutex};
-use std::{error::Error, thread};
+use std::fs::File;
 use std::fs::{self, OpenOptions};
 use std::io::{BufReader, Read};
-use std::time::{Duration, SystemTime, UNIX_EPOCH};
-use std::fs::File;
 use std::path::Path;
 use std::ptr;
+use std::sync::{mpsc, Arc, Mutex};
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
+use std::{error::Error, thread};
 use toml;
 #[cfg(windows)]
 use winapi::um::sysinfoapi::GetTickCount64;
@@ -28,12 +28,12 @@ use crate::LockFileData;
 pub fn get_system_boot_time() -> SystemTime {
     // Ottieni il tempo di attività del sistema in millisecondi
     let uptime_ms = unsafe { GetTickCount64() };
-    let now = SystemTime::now();        // può generare discrepanza
-    
+    let now = SystemTime::now(); // può generare discrepanza
+
     // Calcola il tempo di boot
     let boot_time = now - Duration::from_millis(uptime_ms);
-    
-    // Azzera i millisecondi --> per evitare discrepanze 
+
+    // Azzera i millisecondi --> per evitare discrepanze
     let duration_since_epoch = boot_time
         .duration_since(UNIX_EPOCH)
         .unwrap_or_else(|_| Duration::new(0, 0));
@@ -73,17 +73,21 @@ pub fn get_system_boot_time() -> std::time::SystemTime {
     UNIX_EPOCH + Duration::from_secs(rounded_seconds)
 }
 
-
 #[cfg(windows)]
 pub fn toggle_auto_start(enable: bool) {
-    use winreg::RegKey;
-    use winreg::enums::*;
     use std::env;
+    use winreg::enums::*;
+    use winreg::RegKey;
 
     let hkcu = RegKey::predef(HKEY_CURRENT_USER);
-    let key = hkcu.open_subkey_with_flags("Software\\Microsoft\\Windows\\CurrentVersion\\Run", KEY_SET_VALUE).unwrap();
+    let key = hkcu
+        .open_subkey_with_flags(
+            "Software\\Microsoft\\Windows\\CurrentVersion\\Run",
+            KEY_SET_VALUE,
+        )
+        .unwrap();
     let program_name = "BackupGroup24"; // Nome della tua applicazione
-    
+
     // Ottieni il percorso dell'eseguibile dinamicamente
     let current_dir = env::current_exe().unwrap();
     let app_path = current_dir.to_str().unwrap(); // Converte il percorso in stringa
@@ -97,9 +101,9 @@ pub fn toggle_auto_start(enable: bool) {
 
 #[cfg(not(windows))]
 pub fn toggle_auto_start(enable: bool) {
+    use std::env;
     use std::fs::{self, OpenOptions};
     use std::io::Write;
-    use std::env;
 
     let autostart_dir = format!("{}/.config/autostart", env::var("HOME").unwrap());
     let autostart_file = format!("{}/BackupGroup24.desktop", autostart_dir);
@@ -134,10 +138,12 @@ pub fn toggle_auto_start(enable: bool) {
 
 #[cfg(windows)]
 pub fn check_auto_start_status() -> bool {
-    use winreg::RegKey;
     use winreg::enums::*;
+    use winreg::RegKey;
     let hkcu = RegKey::predef(HKEY_CURRENT_USER);
-    let key = hkcu.open_subkey("Software\\Microsoft\\Windows\\CurrentVersion\\Run").unwrap();
+    let key = hkcu
+        .open_subkey("Software\\Microsoft\\Windows\\CurrentVersion\\Run")
+        .unwrap();
     let program_name = "BackupGroup24"; // Il nome del programma da verificare
     key.get_value::<String, _>(program_name).is_ok()
 }
@@ -303,7 +309,11 @@ pub fn load_image_as_icon(path: &str) -> Result<IconData, Box<dyn Error>> {
     })
 }
 
-pub fn monitor_lock_file(lock_file_path: &'static str, shared_state: Arc<Mutex<AppState>>, tx: mpsc::Sender<String>) {
+pub fn monitor_lock_file(
+    lock_file_path: &'static str,
+    shared_state: Arc<Mutex<AppState>>,
+    tx: mpsc::Sender<String>,
+) {
     thread::spawn(move || {
         // Ottieni l'ultimo tempo di modifica del file di lock
         let mut last_modified = fs::metadata(lock_file_path)
@@ -335,7 +345,9 @@ pub fn monitor_lock_file(lock_file_path: &'static str, shared_state: Arc<Mutex<A
                                             println!("Message sent to show GUI.");
                                         }
                                     } else {
-                                        println!("GUI already active. Skipping message from lock file.");
+                                        println!(
+                                            "GUI already active. Skipping message from lock file."
+                                        );
                                     }
 
                                     // Imposta show_gui a false nel file

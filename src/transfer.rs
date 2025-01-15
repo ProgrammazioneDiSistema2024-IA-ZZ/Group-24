@@ -54,6 +54,7 @@ pub fn perform_backup_with_stop(
         let total_files = count_files_in_directory(source_path).unwrap();
 
         let mut files_copied = 0;
+        let mut total_copied_size = 0;
         // Esegui il backup
         if let Err(e) = backup_folder_with_stop(
             source_path,
@@ -64,16 +65,18 @@ pub fn perform_backup_with_stop(
             total_files,
             &mut files_copied,
             state,
+            &mut total_copied_size,
         ) {
             play_sound("Sounds/incorrect-buzzer-sound-147336.mp3");
             return Err(format!("Backup failed: {}", e));
         } else {
             play_sound("Sounds/bellding-254774.mp3");
             let duration = start_time.elapsed().as_secs(); // Durata del backup in secondi
-            let total_size = get_total_size(source_path).map_err(|e| e.to_string())?; // Calcola i dati trasferiti in byte
-                                                                                      // Registra i dettagli del backup nelle analitiche
+
+            // let total_size = get_total_size(source_path).map_err(|e| e.to_string())?; // Calcola i dati trasferiti in byte
+            // Registra i dettagli del backup nelle analitiche
             let cpu_usage = get_cpu_usage();
-            log_backup_data_to_csv(total_size, duration, cpu_usage);
+            log_backup_data_to_csv(total_copied_size, duration, cpu_usage);
         }
 
         Ok(())
@@ -94,6 +97,7 @@ fn backup_folder_with_stop(
     total_files: u64,
     files_copied: &mut i32,
     state: &mut MyApp,
+    total_copied_size: &mut u64,
 ) -> io::Result<()> {
     // Crea la directory di destinazione se non esiste
     if !destination.exists() {
@@ -130,6 +134,7 @@ fn backup_folder_with_stop(
                 total_files,
                 files_copied,
                 state,
+                total_copied_size,
             )?;
         } else if path.is_file() {
             // Copia il file se rientra nei criteri
@@ -142,12 +147,17 @@ fn backup_folder_with_stop(
                 fs::copy(&path, &dest_path)?;
 
                 // Controlla l'integrità del file copiato
-                if !verify_file_integrity(&path, &dest_path)? {
-                    return Err(io::Error::new(
-                        io::ErrorKind::Other,
-                        format!("File corrotto: {:?}", path),
-                    ));
-                }
+                // if !verify_file_integrity(&path, &dest_path)? {
+                //     return Err(io::Error::new(
+                //         io::ErrorKind::Other,
+                //         format!("File corrotto: {:?}", path),
+                //     ));
+                // }
+
+                // Aggiorna la dimensione totale dei dati copiati
+                let file_size = path.metadata()?.len();
+                *total_copied_size += file_size;
+
                 // Aggiorna il progresso
                 *files_copied += 1;
                 println!("File copiati: {:?}", files_copied);
@@ -220,23 +230,23 @@ fn matches_file_type(file: &Path, file_types: &[&str]) -> bool {
     }
 }
 
-fn get_total_size(path: &Path) -> io::Result<u64> {
-    let mut total_size = 0;
+// fn get_total_size(path: &Path) -> io::Result<u64> {
+//     let mut total_size = 0;
 
-    if path.is_dir() {
-        for entry in fs::read_dir(path)? {
-            let entry = entry?;
-            let entry_path = entry.path();
-            if entry_path.is_file() {
-                total_size += entry_path.metadata()?.len();
-            } else if entry_path.is_dir() {
-                total_size += get_total_size(&entry_path)?;
-            }
-        }
-    }
+//     if path.is_dir() {
+//         for entry in fs::read_dir(path)? {
+//             let entry = entry?;
+//             let entry_path = entry.path();
+//             if entry_path.is_file() {
+//                 total_size += entry_path.metadata()?.len();
+//             } else if entry_path.is_dir() {
+//                 total_size += get_total_size(&entry_path)?;
+//             }
+//         }
+//     }
 
-    Ok(total_size)
-}
+//     Ok(total_size)
+// }
 
 fn get_cpu_usage() -> f32 {
     let sys = System::new();
@@ -257,27 +267,27 @@ fn get_cpu_usage() -> f32 {
     }
 }
 
-/// Verifica l'integrità del file copiato confrontando gli hash SHA256
-fn verify_file_integrity(source: &Path, destination: &Path) -> io::Result<bool> {
-    let source_hash = calculate_file_hash(source)?;
-    let destination_hash = calculate_file_hash(destination)?;
+// Verifica l'integrità del file copiato confrontando gli hash SHA256
+// fn verify_file_integrity(source: &Path, destination: &Path) -> io::Result<bool> {
+//     let source_hash = calculate_file_hash(source)?;
+//     let destination_hash = calculate_file_hash(destination)?;
 
-    Ok(source_hash == destination_hash)
-}
+//     Ok(source_hash == destination_hash)
+// }
 
-/// Calcola l'hash SHA256 di un file
-fn calculate_file_hash(file_path: &Path) -> io::Result<String> {
-    let mut file = File::open(file_path)?;
-    let mut hasher = Sha256::new();
-    let mut buffer = [0u8; 1024];
+// /// Calcola l'hash SHA256 di un file
+// fn calculate_file_hash(file_path: &Path) -> io::Result<String> {
+//     let mut file = File::open(file_path)?;
+//     let mut hasher = Sha256::new();
+//     let mut buffer = [0u8; 1024];
 
-    loop {
-        let bytes_read = file.read(&mut buffer)?;
-        if bytes_read == 0 {
-            break;
-        }
-        hasher.update(&buffer[..bytes_read]);
-    }
+//     loop {
+//         let bytes_read = file.read(&mut buffer)?;
+//         if bytes_read == 0 {
+//             break;
+//         }
+//         hasher.update(&buffer[..bytes_read]);
+//     }
 
-    Ok(format!("{:x}", hasher.finalize()))
-}
+//     Ok(format!("{:x}", hasher.finalize()))
+// }
