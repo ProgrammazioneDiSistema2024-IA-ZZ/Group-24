@@ -38,6 +38,7 @@ use signal_hook::iterator::Signals;
 struct LockFileData {
     boot_time: String,  // supponiamo che il tempo di avvio sia una stringa in formato ISO 8601
     show_gui: bool,
+    display: bool,
 }
 
 static LOCK_FILE_PATH: &str = "lock.toml";   // Il file di lock che indica se un'istanza è in esecuzione
@@ -80,6 +81,8 @@ fn main() -> Result<(), eframe::Error> {
     let current_boot_time = get_system_boot_time();
     println!("{:?}", current_boot_time);
 
+    let run_gui;        //default per aperture successive
+
     // Controlla se il file di lock esiste
     if Path::new(LOCK_FILE_PATH).exists() {
         // Leggi il file lock.toml
@@ -92,6 +95,9 @@ fn main() -> Result<(), eframe::Error> {
                     println!("{:?}", saved_boot_time_as_system_time);
 
                     if current_boot_time > saved_boot_time_as_system_time {
+                        //Primo avvio dopo startup
+                        run_gui = lock_data.display;
+
                         // Boot time corrente maggiore: sovrascrivi `boot_time` e apri la GUI
                         lock_data.boot_time = format!("{}", DateTime::<Utc>::from(current_boot_time));
                         lock_data.show_gui = false; // Resetta il flag di GUI
@@ -135,6 +141,7 @@ fn main() -> Result<(), eframe::Error> {
         let lock_data = LockFileData {
             boot_time: format!("{}", DateTime::<Utc>::from(current_boot_time)),
             show_gui: false,
+            display: true,      //default apri all'avvio
         };
         if let Ok(content) = toml::to_string(&lock_data) {
             if let Err(e) = fs::write(LOCK_FILE_PATH, content) {
@@ -145,6 +152,8 @@ fn main() -> Result<(), eframe::Error> {
                 println!("Application is running...");
             }
         }
+
+        run_gui = true;     //mostra GUI la prima volta!!
     }
 
     // Gestione dei segnali
@@ -209,6 +218,15 @@ fn main() -> Result<(), eframe::Error> {
         }
     }));
 
+    // sincronizza campo display con run_gui
+    let temp_run_gui;
+    {
+        temp_run_gui = shared_state.lock().unwrap().run_gui;
+    }
+    {
+        shared_state.lock().unwrap().display = temp_run_gui;
+    }
+
     // Avvia thread per controllo GUI, per mostrare user panel
     let monitor_state = Arc::clone(&shared_state);
     let monitor_tx = tx.clone(); 
@@ -260,10 +278,6 @@ fn main() -> Result<(), eframe::Error> {
             Arc::new(AtomicBool::new(true)),
         );
     });
-
-    let run_gui =  {
-        shared_state.lock().unwrap().display.clone()     //viene presa dal file di configurazione
-    };
 
     if run_gui {
         println!("GUI started for the first time.");
