@@ -10,7 +10,6 @@ pub fn show_analytics_panel(ui: &mut Ui) {
         ui.vertical(|ui| {
             // Sezione di panoramica
             ui.heading(RichText::new("Section 1: Overview").color(Color32::from_rgb(0x87, 0xCE, 0xFA)));
-            ui.separator();
 
             // Calcola statistiche dalla CPU
             if let Some(cpu_data) = read_cpu_usage_data("cpu_usage_log.csv") {
@@ -50,59 +49,53 @@ pub fn show_analytics_panel(ui: &mut Ui) {
 
         ui.vertical(|ui| {
             ui.heading(RichText::new("Section 2: CPU Usage over Time").color(Color32::from_rgb(0x87, 0xCE, 0xFA)));
-            ui.separator();
 
-            if let Some(cpu_data) = read_cpu_usage_data("cpu_usage_log.csv") {
-                // Calcola gli ultimi 5 valori
-                let total_points = cpu_data.len();
-                let start_index = total_points.saturating_sub(unsafe { SHOWN_LOGS_CPU });
-            
-                // Creazione della tabella per visualizzare i log di utilizzo della CPU
-                egui::Grid::new("cpu_usage_table")
-                    .striped(true)
-                    .show(ui, |ui| {
-                        // Intestazioni della tabella
-                        ui.label("Timestamp");
-                        ui.label("CPU Usage (%)");
-                        ui.end_row();
-            
-                        // Popola la tabella con i dati (gli ultimi `SHOWN_LOGS` valori)
-                        for (timestamp, cpu_usage) in cpu_data.iter().skip(start_index) {
-                            ui.label(timestamp);   // Timestamp
-                            ui.label(format!("{:.2}%", cpu_usage)); // CPU Usage (%)
-                            ui.end_row();                           // Fine della riga
+            unsafe {
+                if let Some(cpu_data) = read_cpu_usage_data("cpu_usage_log.csv") {
+                    // Calcola gli ultimi 5 valori
+                    let total_points = cpu_data.len();
+                
+                    // Creazione della tabella per visualizzare i log di utilizzo della CPU
+                    egui::Grid::new("cpu_usage_table")
+                        .striped(true)
+                        .show(ui, |ui| {
+                            // Intestazioni della tabella
+                            ui.label("Timestamp");
+                            ui.label("CPU Usage (%)");
+                            ui.end_row();
+                
+                            // Popola la tabella con i dati (gli ultimi `SHOWN_LOGS` valori)
+                            for (timestamp, cpu_usage) in cpu_data.iter().rev().take(SHOWN_LOGS_CPU) {
+                                ui.label(timestamp);   // Timestamp
+                                ui.label(format!("{:.2}%", cpu_usage)); // CPU Usage (%)
+                                ui.end_row();                           // Fine della riga
+                            }
+                        });
+                    ui.horizontal(|ui| {
+                        // Aggiungi il pulsante per vedere più log (i 5 valori più vecchi)
+                        if SHOWN_LOGS_CPU < total_points {
+                            if ui.button("Show more").clicked() {
+                                SHOWN_LOGS_CPU += 5; // Mostra 5 log in più
+                            }
+                        }
+                        // Mostra il pulsante per ripristinare i log a 5
+                        if SHOWN_LOGS_CPU > 5 {
+                            if ui.button("Restore").clicked() {
+                                SHOWN_LOGS_CPU = 5; // Ripristina a 5 log
+                            }
                         }
                     });
-            ui.horizontal(|ui| {
-                // Aggiungi il pulsante per vedere più log (i 5 valori più vecchi)
-                unsafe {
-                    if SHOWN_LOGS_CPU < total_points {
-                        if ui.button("Show more").clicked() {
-                            SHOWN_LOGS_CPU += 5; // Mostra 5 log in più
-                        }
-                    }
+                } else {
+                    ui.label("No CPU usage data available.");
                 }
-                // Mostra il pulsante per ripristinare i log a 5
-                unsafe {
-                    if SHOWN_LOGS_CPU > 5 {
-                        if ui.button("Show less").clicked() {
-                            SHOWN_LOGS_CPU = 5; // Ripristina a 5 log
-                        }
-                    }
-                }
-            });
-            } else {
-                ui.label("No CPU usage data available.");
             }
         });
-
-        
                 
         ui.separator();
 
         // Sezione Backup Log
         ui.vertical(|ui| {
-            ui.label("Backup Log:");
+            ui.heading(RichText::new("Section 3: Backup Log").color(Color32::from_rgb(0x87, 0xCE, 0xFA)));
 
             // Rendi sicura la variabile globale con unsafe
             unsafe {
@@ -116,34 +109,34 @@ pub fn show_analytics_panel(ui: &mut Ui) {
                         .show(ui, |ui| {
                             // Intestazioni della tabella
                             ui.label("Timestamp");
-                            ui.label("Duration (s)");
-                            ui.label("Data (bytes)");
+                            ui.label("Duration");
+                            ui.label("Data");
                             ui.label("CPU Usage (%)");
                             ui.end_row();
 
                             // Popola la tabella con i log di backup (gli ultimi SHOWN_LOGS_BACKUP log)
-                            for entry in backup_entries.iter().rev().skip(total_entries.saturating_sub(SHOWN_LOGS_BACKUP)) {
+                            for entry in backup_entries.iter().rev().take(SHOWN_LOGS_BACKUP) {
                                 ui.label(&entry.timestamp);                // Timestamp
-                                ui.label(format!("{}", entry.duration));   // Duration (s)
-                                ui.label(format!("{}", entry.data_transferred)); // Data (bytes)
+                                ui.label(format_duration(entry.duration));   // Durata formattata
+                                ui.label(format_data_size(entry.data_transferred)); // Data (formattata)
                                 ui.label(format!("{:.2}%", entry.cpu_usage));    // CPU Usage (%)
                                 ui.end_row(); // Fine della riga
                             }
                         });
-                ui.horizontal(|ui| {
-                    // Aggiungi il pulsante per mostrare più log se ce ne sono
-                    if SHOWN_LOGS_BACKUP < total_entries {
-                        if ui.button("Show more").clicked() {
-                            SHOWN_LOGS_BACKUP += 5; // Mostra altri 5 log
+                    ui.horizontal(|ui| {
+                        // Aggiungi il pulsante per mostrare più log se ce ne sono
+                        if SHOWN_LOGS_BACKUP < total_entries {
+                            if ui.button("Show more").clicked() {
+                                SHOWN_LOGS_BACKUP += 5; // Mostra altri 5 log
+                            }
+                        } 
+                        // Mostra il pulsante per ripristinare i log a 5
+                        if SHOWN_LOGS_BACKUP > 5 {
+                            if ui.button("Restore").clicked() {
+                                SHOWN_LOGS_BACKUP = 5; // Ripristina a 5 log
+                            }
                         }
-                    } 
-                    // Mostra il pulsante per ripristinare i log a 5
-                    if SHOWN_LOGS_BACKUP > 5 {
-                        if ui.button("Show less").clicked() {
-                            SHOWN_LOGS_BACKUP = 5; // Ripristina a 5 log
-                        }
-                    }
-                });
+                    });
                 } else {
                     ui.label("No backup log data available.");
                 }
@@ -151,6 +144,7 @@ pub fn show_analytics_panel(ui: &mut Ui) {
         });
     });
 }
+
 // Funzione per leggere i dati del file CSV di CPU usage
 fn read_cpu_usage_data(file_path: &str) -> Option<Vec<(String, f32)>> {
     if let Ok(data) = fs::read_to_string(file_path) {
@@ -210,4 +204,41 @@ struct BackupLogEntry {
     duration: u64,      // Durata in secondi
     data_transferred: u64, // Dati trasferiti in byte
     cpu_usage: f32,     // Utilizzo della CPU in percentuale
+}
+
+fn format_data_size(bytes: u64) -> String {
+    const KB: u64 = 1024;
+    const MB: u64 = 1024 * KB;
+    const GB: u64 = 1024 * MB;
+
+    if bytes >= GB {
+        format!("{:.2} GB", bytes as f64 / GB as f64)
+    } else if bytes >= MB {
+        format!("{:.2} MB", bytes as f64 / MB as f64)
+    } else if bytes >= KB {
+        format!("{:.2} KB", bytes as f64 / KB as f64)
+    } else {
+        format!("{} B", bytes)
+    }
+}
+
+fn format_duration(duration: u64) -> String {
+    const SECOND: u64 = 1;
+    const MINUTE: u64 = 60 * SECOND;
+    const HOUR: u64 = 60 * MINUTE;
+
+    if duration >= HOUR {
+        let hours = duration / HOUR;
+        let minutes = (duration % HOUR) / MINUTE;
+        let seconds = (duration % MINUTE) / SECOND;
+        format!("{}h {}m {}s", hours, minutes, seconds)
+    } else if duration >= MINUTE {
+        let minutes = duration / MINUTE;
+        let seconds = duration % MINUTE;
+        format!("{}m {}s", minutes, seconds)
+    } else if duration >= SECOND {
+        format!("{}s", duration)
+    } else {
+        "~1s".to_string()  // Mostra "~1s" per durate inferiori a 1 secondo
+    }
 }
