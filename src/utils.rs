@@ -1,7 +1,7 @@
 use eframe::IconData;
 use image::RgbaImage;
 use rodio::{source::Source, Decoder, OutputStream};
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use std::fs::File;
 use std::fs::{self, OpenOptions};
 use std::io::{self, BufReader, Read, Write};
@@ -15,6 +15,8 @@ use toml;
 use winapi::um::sysinfoapi::GetTickCount64;
 #[cfg(windows)]
 use winapi::um::winuser::{GetSystemMetrics, SM_CXSCREEN, SM_CYSCREEN};
+#[cfg(windows)]
+use winapi::um::winuser::SetProcessDPIAware;
 #[cfg(not(windows))]
 extern crate x11;
 #[cfg(not(windows))]
@@ -163,6 +165,8 @@ pub fn get_screen_resolution() -> Option<(u32, u32)> {
     #[cfg(windows)]
     {
         unsafe {
+            SetProcessDPIAware();
+
             // Usa le funzioni di WinAPI per ottenere la risoluzione dello schermo
             let width = GetSystemMetrics(SM_CXSCREEN);
             let height = GetSystemMetrics(SM_CYSCREEN);
@@ -210,18 +214,19 @@ pub fn play_sound(file_path: &str) {
         }
     });
 }
-#[derive(Deserialize, Debug)]
+#[derive(Deserialize, Debug, Serialize)]
 struct Config {
     source_folder: String,
     destination_folder: String,
     backup_type: String,
     file_types: Vec<String>,
+    display: bool
 }
 
 #[derive(Debug, Clone)]
 pub enum Configuration {
     Created,
-    Build(String, String, String, Vec<String>),
+    Build(String, String, String, Vec<String>, bool),
     Error,
 }
 
@@ -236,6 +241,7 @@ source_folder = ''
 destination_folder = ''
 backup_type = 'total'
 file_types = []
+display = true
 "#;
         if fs::write(config_path, default_config).is_err() {
             return Configuration::Error;
@@ -259,6 +265,7 @@ source_folder = ''
 destination_folder = ''
 backup_type = 'total'
 file_types = []
+display = true
 "#;
             if fs::write(config_path, default_config).is_err() {
                 return Configuration::Error;
@@ -282,6 +289,7 @@ file_types = []
         parsed.destination_folder,
         parsed.backup_type,
         parsed.file_types,
+        parsed.display,
     )
 }
 
@@ -379,42 +387,42 @@ pub fn monitor_lock_file(
 }
 
 
-pub fn update_lock_file_display(display: bool) -> io::Result<()> {
-    // Carichiamo il contenuto del file lock.toml
-    let path = "lock.toml"; // Modifica il percorso se necessario
+pub fn update_config_file_display(display: bool) -> io::Result<()> {
+    // Carichiamo il contenuto del file config_build.toml
+    let path = "config_build.toml"; // Modifica il percorso se necessario
     let content = fs::read_to_string(path)?;
 
-    // Deserializziamo il contenuto in un'istanza di LockFileData
-    let mut lock_file_data: LockFileData = toml::from_str(&content)
+    // Deserializziamo il contenuto in un'istanza di Config
+    let mut config_file_data: Config = toml::from_str(&content)
         .map_err(|err| io::Error::new(io::ErrorKind::InvalidData, err.to_string()))?;
 
     // Aggiorniamo il valore del campo `display`
-    lock_file_data.display = display;
+    config_file_data.display = display;
 
     // Serializziamo di nuovo i dati aggiornati
-    let updated_content = toml::to_string(&lock_file_data)
+    let updated_content = toml::to_string(&config_file_data)
         .map_err(|err| io::Error::new(io::ErrorKind::Other, err.to_string()))?;
 
-    // Scriviamo i dati aggiornati nel file lock.toml
+    // Scriviamo i dati aggiornati nel file config_build.toml
     let mut file = fs::File::create(path)?;
     file.write_all(updated_content.as_bytes())?;
 
     Ok(())
 }
 
-pub fn read_lock_file_display() -> bool {
-    // Percorso del file lock.toml
-    let path = "lock.toml"; // Modifica il percorso se necessario
+pub fn read_config_file_display() -> bool {
+    // Percorso del file config_build.toml
+    let path = "config_build.toml"; // Modifica il percorso se necessario
 
-    // Carichiamo il contenuto del file lock.toml
+    // Carichiamo il contenuto del file config_build.toml
     let content = fs::read_to_string(path);
     if content.is_err() {
         return false; // Fallimento nella lettura del file
     }
 
-    // Deserializziamo il contenuto in un'istanza di LockFileData
-    let lock_file_data: Result<LockFileData, _> = toml::from_str(&content.unwrap());
-    if let Ok(data) = lock_file_data {
+    // Deserializziamo il contenuto in un'istanza di Config
+    let config_file_data: Result<Config, _> = toml::from_str(&content.unwrap());
+    if let Ok(data) = config_file_data {
         return data.display; // Restituisce il valore del campo `display`
     }
     

@@ -38,7 +38,6 @@ use signal_hook::iterator::Signals;
 struct LockFileData {
     boot_time: String,  // supponiamo che il tempo di avvio sia una stringa in formato ISO 8601
     show_gui: bool,
-    display: bool,
 }
 
 static LOCK_FILE_PATH: &str = "lock.toml";   // Il file di lock che indica se un'istanza è in esecuzione
@@ -95,8 +94,6 @@ fn main() -> Result<(), eframe::Error> {
                     println!("{:?}", saved_boot_time_as_system_time);
 
                     if current_boot_time > saved_boot_time_as_system_time {
-                        //Primo avvio dopo startup
-                        run_gui = lock_data.display;
 
                         // Boot time corrente maggiore: sovrascrivi `boot_time` e apri la GUI
                         lock_data.boot_time = format!("{}", DateTime::<Utc>::from(current_boot_time));
@@ -140,8 +137,7 @@ fn main() -> Result<(), eframe::Error> {
         // Crea un nuovo file lock.toml
         let lock_data = LockFileData {
             boot_time: format!("{}", DateTime::<Utc>::from(current_boot_time)),
-            show_gui: false,
-            display: true,      //default apri all'avvio
+            show_gui: false
         };
         if let Ok(content) = toml::to_string(&lock_data) {
             if let Err(e) = fs::write(LOCK_FILE_PATH, content) {
@@ -152,8 +148,7 @@ fn main() -> Result<(), eframe::Error> {
                 println!("Application is running...");
             }
         }
-
-        run_gui = true;     //mostra GUI la prima volta!!
+        
     }
 
     // Gestione dei segnali
@@ -213,18 +208,17 @@ fn main() -> Result<(), eframe::Error> {
             state.exit_message = Some("Impossible to retrieve configuration file!".to_string());
             state
         }
-        Configuration::Created | Configuration::Build(_, _, _, _) => {
+        Configuration::Created | Configuration::Build(_, _, _, _, _) => {
             AppState::new_from_config(config.clone())
         }
     }));
 
-    // sincronizza campo display con run_gui
-    let temp_run_gui;
+    /* prendi valore da config_build --> sincronizza display con run_gui --> sincronizza dinamico con statico */
     {
-        temp_run_gui = shared_state.lock().unwrap().run_gui;
+        run_gui = shared_state.lock().unwrap().run_gui;
     }
     {
-        shared_state.lock().unwrap().display = temp_run_gui;
+        shared_state.lock().unwrap().display = run_gui;
     }
 
     // Avvia thread per controllo GUI, per mostrare user panel

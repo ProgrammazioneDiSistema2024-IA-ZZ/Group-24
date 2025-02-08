@@ -1,7 +1,7 @@
 use eframe::egui::{self, RichText};
 use egui::Color32;
 use crate::ui::AppState;
-use crate::utils::{toggle_auto_start, update_lock_file_display};
+use crate::utils::{toggle_auto_start, update_config_file_display};
 
 /// Show the info panel
 pub fn show_info_panel(ui: &mut egui::Ui, state: &mut AppState) {
@@ -26,7 +26,7 @@ pub fn show_info_panel(ui: &mut egui::Ui, state: &mut AppState) {
     // Quando l'utente cambia lo stato della checkbox, aggiorniamo la configurazione
     if run_gui_enabled != state.run_gui {
         state.run_gui = run_gui_enabled;
-        if let Err(_err) = update_lock_file_display(run_gui_enabled) {
+        if let Err(_err) = update_config_file_display(run_gui_enabled) {
             ui.colored_label(egui::Color32::RED, "Errore di aggiornamento.");
         }
     }

@@ -11,6 +11,7 @@ pub struct ConfigToSave {
     pub destination_folder: String,
     pub backup_type: String,
     pub file_types: Vec<String>,
+    pub display: bool
 }
 
 const MAX_FILE_TYPES: usize = 10;
@@ -116,30 +117,15 @@ pub fn show_backup_panel(ui: &mut egui::Ui, state: &mut AppState) {
         });
         ui.horizontal_wrapped(|ui| {
             for (index, file_type) in state.file_types.clone().iter().enumerate() {
-                if ui.button(file_type).clicked() {
+
+                let response = ui.add(egui::Button::new(file_type).sense(egui::Sense::click()))
+                    .on_hover_ui(|ui| {
+                        ui.label("Click to remove");
+                    });
+        
+                if response.clicked() {
                     state.file_types.remove(index);
                 }
-
-
-                /* // Carica l'immagine del cestino come texture
-                let delete_icon = load_image_as_egui_texture(ui.ctx(), "images/delete.png");
-
-                // Configura il bottone con testo e icona
-                let button_content = ui.horizontal(|ui| {
-                    ui.label(file_type); // Testo dell'estensione
-                    if let Some(icon) = &delete_icon {
-                        ui.image(icon.id(), [16.0, 16.0]); // Aggiunge l'icona accanto al testo
-                    }
-                });
-
-                // Disegna il pulsante e gestisce il click
-                if ui
-                    .add(egui::Button::new(button_content.response))
-                    .on_hover_text("Click to remove") // Tooltip
-                    .clicked()
-                {
-                    state.file_types.remove(index); // Rimuove l'estensione
-                } */
             }
         });
     }
@@ -215,6 +201,7 @@ pub fn save_folders(state: &mut AppState){
         destination_folder: state.destination_folder.clone(),
         backup_type: state.backup_type.clone(),
         file_types: state.file_types.clone(),
+        display: state.run_gui
     };
 
     // Prova a serializzare lo stato in formato TOML e a salvare il file

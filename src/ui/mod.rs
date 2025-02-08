@@ -5,7 +5,7 @@ use backup::save_folders;
 use eframe::egui::{self, Color32, Ui};
 use serde::Serialize;
 use std::sync::mpsc::Sender;
-use crate::utils::{check_auto_start_status, read_lock_file_display};
+use crate::utils::{check_auto_start_status, read_config_file_display};
 
 use std::{
     process,
@@ -98,7 +98,7 @@ impl AppState {
     /// Crea un nuovo stato applicativo basandosi su una configurazione o sui valori di default.
     pub fn new_from_config(config: Configuration) -> Self {
         match config {
-            Configuration::Build(source_folder, destination_folder, backup_type, file_types) => {
+            Configuration::Build(source_folder, destination_folder, backup_type, file_types, _) => {
                 Self {
                     current_panel: PanelType::Backup, // Pannello di default
                     source_folder,
@@ -118,10 +118,10 @@ impl AppState {
                     exit_message: None,
                     show_info_modal: false,
                     show_confirmation_modal: false,
-                    display: true,
+                    display: true,      // display "dinamico"
                     backup_status: BackupStatus::NotStarted,
                     auto_start_enabled: check_auto_start_status(),
-                    run_gui: read_lock_file_display(),
+                    run_gui: read_config_file_display(),       //prendi il valore dalla configurazione config_build (display "statico")
                 }
             }
             _ => Self {
@@ -139,10 +139,10 @@ impl AppState {
                 exit_message: None,
                 show_error_modal: false,
                 show_confirmation_modal: false,
-                display: true,
+                display: true,  // display "dinamico"
                 backup_status: BackupStatus::NotStarted,
                 auto_start_enabled: check_auto_start_status(),
-                run_gui: read_lock_file_display(),
+                run_gui: read_config_file_display(),      // display "statico" --> default: true (la GUI all'inizio viene sempre mostrata)
             },
         }
     }

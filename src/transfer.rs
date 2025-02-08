@@ -20,7 +20,7 @@ pub fn perform_backup_with_stop(
     let config = manage_configuration_file();
 
     // Verifica se config è di tipo Configuration::Build
-    if let Configuration::Build(source_folder, destination_folder, backup_type, file_types) = config
+    if let Configuration::Build(source_folder, destination_folder, backup_type, file_types, _) = config
     {
         let source_path = Path::new(&source_folder);
         let dest_path = Path::new(&destination_folder);
@@ -146,14 +146,6 @@ fn backup_folder_with_stop(
                 }
                 fs::copy(&path, &dest_path)?;
 
-                // Controlla l'integrità del file copiato
-                // if !verify_file_integrity(&path, &dest_path)? {
-                //     return Err(io::Error::new(
-                //         io::ErrorKind::Other,
-                //         format!("File corrotto: {:?}", path),
-                //     ));
-                // }
-
                 // Aggiorna la dimensione totale dei dati copiati
                 let file_size = path.metadata()?.len();
                 *total_copied_size += file_size;
@@ -174,20 +166,6 @@ fn backup_folder_with_stop(
 
     Ok(())
 }
-
-// // Funzione di utilità per contare i file totali
-// fn count_files(path: &Path) -> io::Result<usize> {
-//     let mut count = 0;
-//     for entry in fs::read_dir(path)? {
-//         let entry = entry?;
-//         if entry.path().is_dir() {
-//             count += count_files(&entry.path())?; // Ricorsivamente
-//         } else {
-//             count += 1;
-//         }
-//     }
-//     Ok(count)
-// }
 
 fn count_files_in_directory(path: &Path) -> io::Result<u64> {
     let mut file_count = 0;
@@ -230,24 +208,6 @@ fn matches_file_type(file: &Path, file_types: &[&str]) -> bool {
     }
 }
 
-// fn get_total_size(path: &Path) -> io::Result<u64> {
-//     let mut total_size = 0;
-
-//     if path.is_dir() {
-//         for entry in fs::read_dir(path)? {
-//             let entry = entry?;
-//             let entry_path = entry.path();
-//             if entry_path.is_file() {
-//                 total_size += entry_path.metadata()?.len();
-//             } else if entry_path.is_dir() {
-//                 total_size += get_total_size(&entry_path)?;
-//             }
-//         }
-//     }
-
-//     Ok(total_size)
-// }
-
 fn get_cpu_usage() -> f32 {
     let sys = System::new();
     match sys.cpu_load_aggregate() {
@@ -266,28 +226,3 @@ fn get_cpu_usage() -> f32 {
         Err(_) => 0.0, // Se fallisce, restituisci 0.0
     }
 }
-
-// Verifica l'integrità del file copiato confrontando gli hash SHA256
-// fn verify_file_integrity(source: &Path, destination: &Path) -> io::Result<bool> {
-//     let source_hash = calculate_file_hash(source)?;
-//     let destination_hash = calculate_file_hash(destination)?;
-
-//     Ok(source_hash == destination_hash)
-// }
-
-// /// Calcola l'hash SHA256 di un file
-// fn calculate_file_hash(file_path: &Path) -> io::Result<String> {
-//     let mut file = File::open(file_path)?;
-//     let mut hasher = Sha256::new();
-//     let mut buffer = [0u8; 1024];
-
-//     loop {
-//         let bytes_read = file.read(&mut buffer)?;
-//         if bytes_read == 0 {
-//             break;
-//         }
-//         hasher.update(&buffer[..bytes_read]);
-//     }
-
-//     Ok(format!("{:x}", hasher.finalize()))
-// }
