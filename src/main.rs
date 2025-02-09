@@ -1,6 +1,6 @@
 // Questo evita che il terminale si apra su Windows e non influisce su altri sistemi operativi.
 // ------- ATTIVA QUANDO BUILD COMPLETA -------
-//#![cfg_attr(target_os = "windows", windows_subsystem = "windows")]
+#![cfg_attr(target_os = "windows", windows_subsystem = "windows")]
 
 mod analytics;
 mod confirm_sign;
