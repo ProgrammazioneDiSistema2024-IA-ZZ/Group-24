@@ -5,7 +5,7 @@ use backup::save_folders;
 use eframe::egui::{self, Color32, Ui};
 use serde::Serialize;
 use std::sync::mpsc::Sender;
-use crate::utils::{check_auto_start_status, read_config_file_display};
+use crate::utils::{check_auto_start_status, read_config_file_display, set_display_true};
 
 use std::{
     process,
@@ -240,6 +240,7 @@ fn render_sidebar(ctx: &egui::Context, state: &mut AppState) {
             if ui.button("Terminate").clicked() {
                 println!("End of the program");
                 remove_lock_file();
+                let _ = set_display_true();
                 process::exit(0); // Terminate the application: halts execution and bypasses Rust's usual stack unwinding mechanism.
             }
         });

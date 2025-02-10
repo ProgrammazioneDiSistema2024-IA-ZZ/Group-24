@@ -428,3 +428,26 @@ pub fn read_config_file_display() -> bool {
     
     false // Fallimento nella deserializzazione o assenza del campo `display`
 }
+
+pub fn set_display_true() -> io::Result<()> {
+    // Carichiamo il contenuto del file config_build.toml
+    let path = "config_build.toml"; // Modifica il percorso se necessario
+    let content = fs::read_to_string(path)?;
+
+    // Deserializziamo il contenuto in un'istanza di Config
+    let mut config_file_data: Config = toml::from_str(&content)
+        .map_err(|err| io::Error::new(io::ErrorKind::InvalidData, err.to_string()))?;
+
+    // Aggiorniamo il valore del campo `display`
+    config_file_data.display = true;
+
+    // Serializziamo di nuovo i dati aggiornati
+    let updated_content = toml::to_string(&config_file_data)
+        .map_err(|err| io::Error::new(io::ErrorKind::Other, err.to_string()))?;
+
+    // Scriviamo i dati aggiornati nel file config_build.toml
+    let mut file = fs::File::create(path)?;
+    file.write_all(updated_content.as_bytes())?;
+
+    Ok(())
+}
