@@ -31,18 +31,27 @@ L'applicazione offre le seguenti funzionalità:
 
 ## Compatibilità
 L'applicazione è compatibile con i seguenti sistemi operativi:
-- Windows 10 o versioni successive
-- Linux (distribuzioni principali come Ubuntu, Fedora, etc.)
-- MacOS (versioni supportate) ?????
+- Windows 10/11
+- Linux (Sviluppato e testato su macchina virtuale con Ubuntu 24.04)
 
-## Installazione
+## Download
 Per installare l'applicazione, segui questi passaggi:
-1. blablabla
+1. Download: dal repository github andare nella cartella download e scegliere la versione per il sistema operativo desiderato.
+2. Estrarre il .zip scaricato
 
+## Avvio
+Una volta estratto il .zip il programma è pronto all'uso, basterà lanciare l'applicazione nella cartella estratta.
+
+LINUX: Per il corretto funzionamento dell'applicazione su linux è necessario impostare Ubuntu Xorg all'avvio del sistema opearativo.
+
+![Linux ](images/linux.JPG)
+
+!!! SPOSTARE L'ESEGUBILE DALLA CARTELLA DI INSTALLAZIONE POTREBBE COMPROMETTERE IL CORRETTO FUNZIONAMENTO DEL PROGRAMMA!!!
 ## Schermate
 Ecco alcune schermate dell'applicazione:
 
 La prima schermata (Info Panel) fornisce una panoramica generale dell'applicazione e delle sue funzionalità principali.
+
 ![Info Panel ](images/InfoPanel.png)
 
 Nella schermata di configurazione del backup puoi selezionare la cartella di origine (source folder), quella di destinazione (destination folder) e specificare le estensioni dei file da salvare (ad esempio .txt, .jpg), oppure lasciare 'all' per includere tutti i file.
