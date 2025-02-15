@@ -1,0 +1,33 @@
+[package]
+name = "pds_project"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+eframe = { version = "0.22", features = ["default", "glow"] }
+serde = { version = "1.0", features = ["derive"] }
+winapi = { version = "0.3", features = ["windef", "winuser", "sysinfoapi"] }
+rodio = "0.17"
+winit = "0.28"
+image = "0.24" 
+rdev = "0.5.3" 
+rfd = "0.13" # File dialog libraryserde = { version = "1.0", features = ["derive"] }
+toml = "0.7" # TOML parsing and serializationwinapi = { version = "0.3", features = ["windef", "winuser"] }
+screen = "0.1.0"
+chrono = "0.4"
+systemstat = "0.1"
+sha2 = "0.10"
+x11 = "2.18.0"
+signal-hook = "0.3"
+
+[target.'cfg(windows)'.dependencies]
+winreg = "0.8"
+
+[[bin]]
+name = "backup_app_group24"
+path = "src/main.rs"
+
+# Disabilita la console su Windows
+windows_subsystem = "windows"

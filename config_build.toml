@@ -1,0 +1,4 @@
+source_folder = 'C:\Users\demol\Desktop\machine learning'
+destination_folder = 'C:\Users\demol\Desktop\salvataggio'
+backup_type = "total"
+file_types = []
