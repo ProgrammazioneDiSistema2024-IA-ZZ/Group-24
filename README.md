@@ -40,14 +40,14 @@ L'applicazione è compatibile con i seguenti sistemi operativi:
 ## Download
 Per installare l'applicazione, segui questi passaggi:
 1. Download: dal repository github andare nella cartella download/ e scegliere la versione per il sistema operativo desiderato.
-  - ![Download ](presentazione/download.png)
+    ![Download ](presentazione/download.png)
 2. Estrarre il .zip scaricato
   - Una volta estratto il .zip il programma è pronto all'uso, basterà lanciare l'applicazione nella cartella estratta.
-  - ![Files ](presentazione/files.jpg)
+    ![Files ](presentazione/files.jpg)
   - **Nota**: Spostare l’eseguibile dalla cartella di installazione potrebbe compromettere il corretto funzionamento del programma.
   - Linux
     - impostare Ubuntu Xorg all'avvio del sistema opearativo.
-    - ![Linux ](presentazione/linux.jpg)
+     ![Linux ](presentazione/linux.jpg)
 
 
 ## Schermate
@@ -57,7 +57,7 @@ Nella schermata di configurazione del backup puoi selezionare la cartella di ori
 Premi su "Save" per salvare la configurazione: verrà utilizzata nella procedura di backup.
 ![Backup_Panel](presentazione/backuppanel.png)
   - Puoi scegliere "Custom" per specificare manualmente le estensioni da salvare (ad esempio .txt, .jpg)
-  - ![Configuration](presentazione/customFiles.png)
+    ![Configuration](presentazione/customFiles.png)
 
 Info Panel fornisce una panoramica generale dell'applicazione e delle sue funzionalità principali.
 Puoi decidere se eseguire l'app in background senza mostrare la GUI e/o far partire il programma all'avvio del sistema operativo.
